@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { normalizeRoomCode } from "@/lib/room";
@@ -26,10 +26,11 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const [input, setInput] = useState("");
   const [status, setStatus] = useState<"connecting" | "live">("connecting");
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  const username = useMemo(
-    () => `User${Math.floor(1000 + Math.random() * 9000)}`,
-    [],
-  );
+  const [username, setUsername] = useState("");
+
+  useEffect(() => {
+    setUsername(`User${Math.floor(1000 + Math.random() * 9000)}`);
+  }, []);
 
   useEffect(() => {
     if (!isRoomValid) {
@@ -81,7 +82,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
   const sendMessage = async () => {
     const trimmed = input.trim();
-    if (!trimmed || !isRoomValid) return;
+    if (!trimmed || !isRoomValid || !username) return;
 
     setInput("");
     await supabase.from("messages").insert({
@@ -115,7 +116,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                 {status === "live" ? "Live" : "Connecting"}
               </span>
               <span className="rounded-full border border-border px-3 py-1 font-mono text-xs">
-                {username}
+                {username || "User----"}
               </span>
               <Link
                 className="rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:border-foreground/40"
@@ -191,13 +192,13 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                   }
                 }}
                 placeholder="Type a message..."
-                disabled={!isRoomValid}
+                disabled={!isRoomValid || !username}
                 className="flex-1 rounded-2xl border border-border bg-black/40 px-4 py-3 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
               />
               <button
                 type="button"
                 onClick={sendMessage}
-                disabled={!isRoomValid}
+                disabled={!isRoomValid || !username}
                 className="rounded-2xl border border-accent/40 bg-accent/10 px-6 py-3 text-sm font-semibold text-foreground transition hover:border-accent/80 hover:bg-accent/20"
               >
                 Send

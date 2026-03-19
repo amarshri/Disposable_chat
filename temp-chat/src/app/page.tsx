@@ -1,13 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { generateRoomCode, normalizeRoomCode } from "@/lib/room";
 
 export default function Home() {
   const router = useRouter();
   const [roomInput, setRoomInput] = useState("");
-  const glow = useMemo(() => generateRoomCode(4), []);
+  const [glow, setGlow] = useState("----");
+
+  useEffect(() => {
+    setGlow(generateRoomCode(4));
+  }, []);
 
   const handleCreate = () => {
     const code = generateRoomCode();
