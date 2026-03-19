@@ -10,7 +10,8 @@ export function generateRoomCode(length: number = ROOM_CODE_LENGTH) {
   return code;
 }
 
-export function normalizeRoomCode(raw: string) {
+export function normalizeRoomCode(raw?: string | null) {
+  if (!raw) return "";
   return raw
     .trim()
     .toUpperCase()

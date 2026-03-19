@@ -177,7 +177,12 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
           <div className="border-t border-border px-6 py-4">
             <div className="flex flex-col gap-3 sm:flex-row">
+              <label htmlFor="messageInput" className="sr-only">
+                Message
+              </label>
               <input
+                id="messageInput"
+                name="message"
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 onKeyDown={(event) => {

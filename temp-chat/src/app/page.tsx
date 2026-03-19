@@ -81,10 +81,15 @@ export default function Home() {
             </div>
 
             <div className="flex flex-col gap-3">
-              <label className="text-xs uppercase tracking-[0.3em] text-muted">
+              <label
+                htmlFor="roomCode"
+                className="text-xs uppercase tracking-[0.3em] text-muted"
+              >
                 Room code
               </label>
               <input
+                id="roomCode"
+                name="roomCode"
                 value={roomInput}
                 onChange={(event) => setRoomInput(event.target.value)}
                 placeholder="e.g. H7K4Q9"
