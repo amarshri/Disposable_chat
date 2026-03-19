@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { normalizeRoomCode } from "@/lib/room";
 
@@ -20,7 +21,14 @@ type RoomClientProps = {
 const CLEANUP_MINUTES = 30;
 
 export default function RoomClient({ roomId }: RoomClientProps) {
-  const normalizedRoomId = normalizeRoomCode(roomId);
+  const params = useParams();
+  const routeRoomId =
+    typeof params.roomId === "string"
+      ? params.roomId
+      : Array.isArray(params.roomId)
+        ? params.roomId[0]
+        : roomId;
+  const normalizedRoomId = normalizeRoomCode(routeRoomId || roomId);
   const isRoomValid = normalizedRoomId.length === 6;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
