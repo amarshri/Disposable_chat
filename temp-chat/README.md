@@ -18,43 +18,9 @@ share a code, and chat instantly.
 
 ## Supabase Setup
 
-1. Create a new Supabase project.
-2. Create the `messages` table:
-
-```sql
-create table public.messages (
-  id uuid primary key default gen_random_uuid(),
-  room_id text not null,
-  username text not null,
-  content text not null,
-  created_at timestamp with time zone default now()
-);
-```
-
-3. Enable Realtime on the `messages` table in the Supabase dashboard.
-4. Add Row Level Security (RLS) policies so anonymous users can read/write:
-
-```sql
-alter table public.messages enable row level security;
-
-create policy "Allow anonymous read"
-on public.messages
-for select
-to anon
-using (true);
-
-create policy "Allow anonymous insert"
-on public.messages
-for insert
-to anon
-with check (true);
-
-create policy "Allow anonymous delete"
-on public.messages
-for delete
-to anon
-using (true);
-```
+1. Create a new Supabase project (free tier is fine).
+2. Open the SQL editor and run `migration.sql` from the repo root.
+3. Confirm Realtime is enabled for `public.messages`.
 
 ## Environment Variables
 
