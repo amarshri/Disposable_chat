@@ -363,10 +363,16 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                         }`}
                       >
                         <div className="flex items-center justify-between gap-3 text-xs text-muted">
-                          <span className="font-medium text-foreground">
+                          <span
+                            className={`font-medium ${
+                              isOwn ? "text-white/90" : "text-foreground"
+                            }`}
+                          >
                             {message.username}
                           </span>
-                          <span>{formatTime(message.created_at)}</span>
+                          <span className={isOwn ? "text-white/70" : ""}>
+                            {formatTime(message.created_at)}
+                          </span>
                         </div>
                         <p className="mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                           {message.content}
