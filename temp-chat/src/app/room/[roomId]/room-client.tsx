@@ -38,8 +38,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const [username, setUsername] = useState("");
   const [roomExists, setRoomExists] = useState<boolean | null>(null);
   const [roomMode, setRoomMode] = useState<"anonymous" | "named" | null>(null);
-  const [storedName, setStoredName] = useState("");
-  const [storedMode, setStoredMode] = useState("");
   const [nameInput, setNameInput] = useState("");
   const [nameError, setNameError] = useState("");
 
@@ -47,10 +45,13 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const joinedRef = useRef(false);
   const joinMessageSentRef = useRef(false);
+  const leftMessageSentRef = useRef(false);
 
   useEffect(() => {
-    setStoredMode(sessionStorage.getItem("chatMode") ?? "");
-    setStoredName(sessionStorage.getItem("chatName") ?? "");
+    // Always prompt for a name in named rooms; don't auto-fill from storage.
+    if (sessionStorage.getItem("chatMode") === "named") {
+      sessionStorage.removeItem("chatName");
+    }
   }, []);
 
   useEffect(() => {
@@ -101,16 +102,13 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     if (roomExists !== true || !roomMode) return;
 
     if (roomMode === "named") {
-      if (storedName.trim()) {
-        setUsername(storedName.trim());
-      }
       return;
     }
 
     if (!username) {
       setUsername(`User${Math.floor(1000 + Math.random() * 9000)}`);
     }
-  }, [roomExists, roomMode, storedName, username]);
+  }, [roomExists, roomMode, username]);
 
   const saveNameAndJoin = () => {
     const trimmed = nameInput.trim();
@@ -122,6 +120,29 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     setUsername(trimmed);
     sessionStorage.setItem("chatMode", "named");
     sessionStorage.setItem("chatName", trimmed);
+  };
+
+  const sendSystemMessage = async (content: string) => {
+    if (leftMessageSentRef.current && content.includes("left the room")) {
+      return;
+    }
+    const payload = {
+      room_id: normalizedRoomId,
+      username: "system",
+      content,
+      message_type: "system",
+    };
+    const { error } = await supabase.from("messages").insert(payload);
+    if (error) {
+      await supabase.from("messages").insert({
+        room_id: normalizedRoomId,
+        username: "system",
+        content,
+      });
+    }
+    if (content.includes("left the room")) {
+      leftMessageSentRef.current = true;
+    }
   };
 
   useEffect(() => {
@@ -145,19 +166,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       joinedRef.current = true;
 
       if (!joinMessageSentRef.current) {
-        const { error } = await supabase.from("messages").insert({
-          room_id: normalizedRoomId,
-          username: "system",
-          content: `${username} joined the room`,
-          message_type: "system",
-        });
-        if (error) {
-          await supabase.from("messages").insert({
-            room_id: normalizedRoomId,
-            username: "system",
-            content: `${username} joined the room`,
-          });
-        }
+        await sendSystemMessage(`${username} joined the room`);
         joinMessageSentRef.current = true;
       }
     };
@@ -189,9 +198,41 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       mounted = false;
       supabase.removeChannel(channel);
       if (joinedRef.current) {
+        sendSystemMessage(`${username} left the room`);
         supabase.rpc("decrement_room", { p_room: normalizedRoomId });
       }
       joinedRef.current = false;
+    };
+  }, [isRoomValid, normalizedRoomId, roomExists, username]);
+
+  useEffect(() => {
+    if (!isRoomValid || roomExists !== true || !username) {
+      return;
+    }
+
+    const handlePageHide = () => {
+      if (!joinedRef.current) return;
+      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/decrement_room`;
+      const payload = JSON.stringify({ p_room: normalizedRoomId });
+      fetch(url, {
+        method: "POST",
+        headers: {
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""}`,
+          "Content-Type": "application/json",
+        },
+        body: payload,
+        keepalive: true,
+      });
+      sendSystemMessage(`${username} left the room`);
+      joinedRef.current = false;
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("beforeunload", handlePageHide);
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+      window.removeEventListener("beforeunload", handlePageHide);
     };
   }, [isRoomValid, normalizedRoomId, roomExists, username]);
 
