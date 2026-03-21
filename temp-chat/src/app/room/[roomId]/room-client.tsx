@@ -358,7 +358,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                       <div
                         className={`max-w-[75%] rounded-2xl border px-4 py-3 text-sm leading-6 ${
                           isOwn
-                            ? "border-[#1e3a5f] bg-[#0f1f33] text-foreground"
+                            ? "border-[#274769] bg-[#1b2d44] text-white"
                             : "border-accent/40 bg-accent/10 text-foreground"
                         }`}
                       >
