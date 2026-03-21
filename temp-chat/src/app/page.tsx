@@ -3,26 +3,79 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { generateRoomCode, normalizeRoomCode } from "@/lib/room";
+import { supabase } from "@/lib/supabaseClient";
+import ThemeToggle from "@/components/theme-toggle";
 
 export default function Home() {
   const router = useRouter();
   const [roomInput, setRoomInput] = useState("");
   const [glow, setGlow] = useState("----");
+  const [chatMode, setChatMode] = useState<"anonymous" | "named">("anonymous");
+  const [displayName, setDisplayName] = useState("");
+  const [joinError, setJoinError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     setGlow(generateRoomCode(4));
   }, []);
 
-  const handleCreate = () => {
+  const persistProfile = () => {
+    sessionStorage.setItem("chatMode", chatMode);
+    sessionStorage.setItem(
+      "chatName",
+      chatMode === "named" ? displayName.trim() : "",
+    );
+  };
+
+  const handleCreate = async () => {
+    setJoinError("");
+    if (chatMode === "named" && !displayName.trim()) {
+      setJoinError("Please enter your name to start a named chat.");
+      return;
+    }
+
+    setBusy(true);
     const code = generateRoomCode();
+    const { error } = await supabase
+      .from("rooms")
+      .upsert({ room_code: code });
+    setBusy(false);
+
+    if (error) {
+      setJoinError("Could not create a room. Please try again.");
+      return;
+    }
+
+    persistProfile();
     router.push(`/room/${code}`);
   };
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
     const code = normalizeRoomCode(roomInput);
     if (code.length !== 6) {
+      setJoinError("Enter a valid 6-character room code.");
       return;
     }
+    if (chatMode === "named" && !displayName.trim()) {
+      setJoinError("Please enter your name to join a named chat.");
+      return;
+    }
+
+    setJoinError("");
+    setBusy(true);
+    const { data, error } = await supabase
+      .from("rooms")
+      .select("room_code")
+      .eq("room_code", code)
+      .maybeSingle();
+    setBusy(false);
+
+    if (error || !data) {
+      setJoinError("Invalid Room Code.");
+      return;
+    }
+
+    persistProfile();
     router.push(`/room/${code}`);
   };
 
@@ -32,9 +85,12 @@ export default function Home() {
     <div className="min-h-screen px-6 py-10 text-foreground">
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-10">
         <header className="flex flex-col gap-4">
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.4em] text-muted">
-            <span className="inline-flex h-2 w-2 rounded-full bg-accent shadow-[0_0_18px_rgba(109,220,255,0.7)]" />
-            Temp Chat
+          <div className="flex flex-wrap items-center justify-between gap-4 text-xs uppercase tracking-[0.4em] text-muted">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-2 w-2 rounded-full bg-accent shadow-[0_0_18px_rgba(109,220,255,0.7)]" />
+              Temp Chat
+            </div>
+            <ThemeToggle />
           </div>
           <h1 className="text-4xl font-semibold leading-tight text-foreground sm:text-5xl">
             Spin up a room, share the code, and talk right now.
@@ -59,9 +115,46 @@ export default function Home() {
                 friends.
               </p>
             </div>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setChatMode("anonymous")}
+                  className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition ${
+                    chatMode === "anonymous"
+                      ? "border-accent/70 bg-accent/10 text-foreground"
+                      : "border-border text-muted hover:border-foreground/40"
+                  }`}
+                >
+                  Anonymous chat
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChatMode("named")}
+                  className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition ${
+                    chatMode === "named"
+                      ? "border-accent/70 bg-accent/10 text-foreground"
+                      : "border-border text-muted hover:border-foreground/40"
+                  }`}
+                >
+                  Named chat
+                </button>
+              </div>
+              {chatMode === "named" && (
+                <input
+                  id="displayName"
+                  name="displayName"
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  placeholder="Your name"
+                  className="rounded-2xl border border-border bg-black/40 px-4 py-3 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
+                />
+              )}
+            </div>
             <button
               onClick={handleCreate}
-              className="group inline-flex items-center justify-between rounded-2xl border border-accent/40 bg-accent/10 px-6 py-4 text-base font-semibold text-foreground transition hover:border-accent/80 hover:bg-accent/20"
+              disabled={busy}
+              className="group inline-flex items-center justify-between rounded-2xl border border-accent/40 bg-accent/10 px-6 py-4 text-base font-semibold text-foreground transition hover:border-accent/80 hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
             >
               Create Room
@@ -102,15 +195,19 @@ export default function Home() {
               />
               <button
                 onClick={handleJoin}
-                disabled={normalized.length !== 6}
+                disabled={normalized.length !== 6 || busy}
                 className="rounded-2xl border border-border bg-foreground/10 px-5 py-3 text-sm font-semibold text-foreground transition hover:border-foreground/40 disabled:cursor-not-allowed disabled:opacity-50"
                 type="button"
               >
                 Join Room
               </button>
-              <p className="text-xs text-muted">
-                Only letters and numbers are accepted.
-              </p>
+              {joinError ? (
+                <p className="text-xs text-red-400">{joinError}</p>
+              ) : (
+                <p className="text-xs text-muted">
+                  Only letters and numbers are accepted.
+                </p>
+              )}
             </div>
           </div>
         </section>

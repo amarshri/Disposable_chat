@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { normalizeRoomCode } from "@/lib/room";
+import ThemeToggle from "@/components/theme-toggle";
 
 type ChatMessage = {
   id: string;
@@ -12,15 +13,15 @@ type ChatMessage = {
   username: string;
   content: string;
   created_at: string;
+  message_type?: "user" | "system";
 };
 
 type RoomClientProps = {
   roomId: string;
 };
 
-const CLEANUP_MINUTES = 30;
-
 export default function RoomClient({ roomId }: RoomClientProps) {
+  const router = useRouter();
   const params = useParams();
   const routeRoomId =
     typeof params.roomId === "string"
@@ -30,20 +31,103 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         : roomId;
   const normalizedRoomId = normalizeRoomCode(routeRoomId || roomId);
   const isRoomValid = normalizedRoomId.length === 6;
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [status, setStatus] = useState<"connecting" | "live">("connecting");
-  const bottomRef = useRef<HTMLDivElement | null>(null);
   const [username, setUsername] = useState("");
+  const [roomExists, setRoomExists] = useState<boolean | null>(null);
+
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const joinedRef = useRef(false);
+  const joinMessageSentRef = useRef(false);
 
   useEffect(() => {
-    setUsername(`User${Math.floor(1000 + Math.random() * 9000)}`);
+    const mode = sessionStorage.getItem("chatMode");
+    const storedName = sessionStorage.getItem("chatName");
+    if (mode === "named" && storedName?.trim()) {
+      setUsername(storedName.trim());
+    } else {
+      setUsername(`User${Math.floor(1000 + Math.random() * 9000)}`);
+    }
   }, []);
 
   useEffect(() => {
-    if (!isRoomValid) {
+    const nav = performance.getEntriesByType(
+      "navigation",
+    )[0] as PerformanceNavigationTiming | undefined;
+    if (nav?.type === "reload" || nav?.type === "back_forward") {
+      router.replace("/");
       return;
     }
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        router.replace("/");
+      }
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, [router]);
+
+  useEffect(() => {
+    if (!isRoomValid) {
+      setRoomExists(false);
+      return;
+    }
+
+    let active = true;
+    const checkRoom = async () => {
+      const { data } = await supabase
+        .from("rooms")
+        .select("room_code")
+        .eq("room_code", normalizedRoomId)
+        .maybeSingle();
+      if (active) {
+        setRoomExists(Boolean(data));
+      }
+    };
+
+    checkRoom();
+    return () => {
+      active = false;
+    };
+  }, [isRoomValid, normalizedRoomId]);
+
+  useEffect(() => {
+    if (!isRoomValid || roomExists !== true || !username) {
+      return;
+    }
+
+    let mounted = true;
+    const initRoom = async () => {
+      const { data } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("room_id", normalizedRoomId)
+        .order("created_at", { ascending: true })
+        .limit(200);
+      if (mounted && data) {
+        setMessages(data as ChatMessage[]);
+      }
+
+      await supabase.rpc("increment_room", { p_room: normalizedRoomId });
+      joinedRef.current = true;
+
+      if (!joinMessageSentRef.current) {
+        await supabase.from("messages").insert({
+          room_id: normalizedRoomId,
+          username,
+          content: `${username} joined the room`,
+          message_type: "system",
+        });
+        joinMessageSentRef.current = true;
+      }
+    };
+
+    initRoom();
 
     const channel = supabase
       .channel(`room:${normalizedRoomId}`)
@@ -66,23 +150,15 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         }
       });
 
-    const cleanupOldMessages = async () => {
-      const cutoff = new Date(Date.now() - CLEANUP_MINUTES * 60 * 1000);
-      await supabase
-        .from("messages")
-        .delete()
-        .eq("room_id", normalizedRoomId)
-        .lt("created_at", cutoff.toISOString());
-    };
-
-    cleanupOldMessages();
-    const cleanupInterval = setInterval(cleanupOldMessages, 5 * 60 * 1000);
-
     return () => {
+      mounted = false;
       supabase.removeChannel(channel);
-      clearInterval(cleanupInterval);
+      if (joinedRef.current) {
+        supabase.rpc("decrement_room", { p_room: normalizedRoomId });
+      }
+      joinedRef.current = false;
     };
-  }, [isRoomValid, normalizedRoomId]);
+  }, [isRoomValid, normalizedRoomId, roomExists, username]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -90,13 +166,17 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
   const sendMessage = async () => {
     const trimmed = input.trim();
-    if (!trimmed || !isRoomValid || !username) return;
+    if (!trimmed || !isRoomValid || !username || roomExists !== true) return;
 
     setInput("");
+    if (inputRef.current) {
+      inputRef.current.style.height = "auto";
+    }
     await supabase.from("messages").insert({
       room_id: normalizedRoomId,
       username,
       content: trimmed,
+      message_type: "user",
     });
   };
 
@@ -116,7 +196,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                 Room Code
               </p>
               <h1 className="text-2xl font-semibold text-foreground">
-                {normalizedRoomId || "Invalid room"}
+                {roomExists === false ? "Invalid room" : normalizedRoomId}
               </h1>
             </div>
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
@@ -126,6 +206,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
               <span className="rounded-full border border-border px-3 py-1 font-mono text-xs">
                 {username || "User----"}
               </span>
+              <ThemeToggle />
               <Link
                 className="rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:border-foreground/40"
                 href="/"
@@ -135,23 +216,34 @@ export default function RoomClient({ roomId }: RoomClientProps) {
             </div>
           </div>
           <p className="text-sm text-muted">
-            Share this code to invite others. Messages are temporary and cleared
-            automatically.
+            Share this code to invite others. Messages persist while at least
+            one user is connected.
           </p>
         </header>
 
-        <section className="flex min-h-[60vh] flex-1 flex-col rounded-3xl border border-border bg-card/60">
-          <div className="flex-1 overflow-y-auto px-6 py-6">
+        <section className="flex min-h-[60vh] flex-1 min-h-0 flex-col rounded-3xl border border-border bg-card/60">
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">
             {messages.length === 0 ? (
               <div className="flex h-full items-center justify-center text-sm text-muted">
-                {isRoomValid
-                  ? "No messages yet. Say hello to get things going."
-                  : "This room code is not valid. Go back and try again."}
+                {roomExists === false
+                  ? "This room code is not valid. Go back and try again."
+                  : "No messages yet. Say hello to get things going."}
               </div>
             ) : (
               <div className="flex flex-col gap-4">
                 {messages.map((message) => {
                   const isOwn = message.username === username;
+                  const isSystem = message.message_type === "system";
+                  if (isSystem) {
+                    return (
+                      <div
+                        key={message.id}
+                        className="rounded-full border border-border bg-foreground/5 px-4 py-2 text-center text-xs text-muted"
+                      >
+                        {message.content}
+                      </div>
+                    );
+                  }
                   return (
                     <div
                       key={message.id}
@@ -172,7 +264,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                           </span>
                           <span>{formatTime(message.created_at)}</span>
                         </div>
-                        <p className="mt-2 whitespace-pre-wrap">
+                        <p className="mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                           {message.content}
                         </p>
                       </div>
@@ -189,24 +281,32 @@ export default function RoomClient({ roomId }: RoomClientProps) {
               <label htmlFor="messageInput" className="sr-only">
                 Message
               </label>
-              <input
+              <textarea
                 id="messageInput"
                 name="message"
+                ref={inputRef}
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
+                onInput={(event) => {
+                  const target = event.currentTarget;
+                  target.style.height = "auto";
+                  target.style.height = `${target.scrollHeight}px`;
+                }}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
                     sendMessage();
                   }
                 }}
                 placeholder="Type a message..."
-                disabled={!isRoomValid || !username}
-                className="flex-1 rounded-2xl border border-border bg-black/40 px-4 py-3 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                rows={1}
+                disabled={!isRoomValid || !username || roomExists !== true}
+                className="flex-1 resize-none rounded-2xl border border-border bg-black/40 px-4 py-3 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
               />
               <button
                 type="button"
                 onClick={sendMessage}
-                disabled={!isRoomValid || !username}
+                disabled={!isRoomValid || !username || roomExists !== true}
                 className="rounded-2xl border border-accent/40 bg-accent/10 px-6 py-3 text-sm font-semibold text-foreground transition hover:border-accent/80 hover:bg-accent/20"
               >
                 Send

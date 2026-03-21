@@ -8,7 +8,8 @@ create table if not exists public.messages (
   room_id text not null,
   username text not null,
   content text not null,
-  created_at timestamp with time zone not null default now()
+  created_at timestamp with time zone not null default now(),
+  message_type text not null default 'user'
 );
 
 create index if not exists messages_room_id_created_at_idx
@@ -51,3 +52,90 @@ begin
     alter publication supabase_realtime add table public.messages;
   end if;
 end $$;
+
+create table if not exists public.rooms (
+  room_code text primary key,
+  active_count integer not null default 0,
+  created_at timestamp with time zone not null default now(),
+  updated_at timestamp with time zone not null default now()
+);
+
+alter table public.rooms enable row level security;
+
+drop policy if exists "Allow anonymous room read" on public.rooms;
+create policy "Allow anonymous room read"
+  on public.rooms
+  for select
+  to anon
+  using (true);
+
+drop policy if exists "Allow anonymous room insert" on public.rooms;
+create policy "Allow anonymous room insert"
+  on public.rooms
+  for insert
+  to anon
+  with check (true);
+
+drop policy if exists "Allow anonymous room update" on public.rooms;
+create policy "Allow anonymous room update"
+  on public.rooms
+  for update
+  to anon
+  using (true)
+  with check (true);
+
+drop policy if exists "Allow anonymous room delete" on public.rooms;
+create policy "Allow anonymous room delete"
+  on public.rooms
+  for delete
+  to anon
+  using (true);
+
+create or replace function public.increment_room(p_room text)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare new_count integer;
+begin
+  insert into public.rooms (room_code, active_count, updated_at)
+  values (p_room, 1, now())
+  on conflict (room_code)
+  do update set active_count = public.rooms.active_count + 1,
+               updated_at = now()
+  returning active_count into new_count;
+
+  return new_count;
+end;
+$$;
+
+create or replace function public.decrement_room(p_room text)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare new_count integer;
+begin
+  update public.rooms
+  set active_count = greatest(active_count - 1, 0),
+      updated_at = now()
+  where room_code = p_room
+  returning active_count into new_count;
+
+  if new_count is null then
+    return 0;
+  end if;
+
+  if new_count = 0 then
+    delete from public.messages where room_id = p_room;
+    delete from public.rooms where room_code = p_room;
+  end if;
+
+  return new_count;
+end;
+$$;
+
+grant execute on function public.increment_room(text) to anon;
+grant execute on function public.decrement_room(text) to anon;
