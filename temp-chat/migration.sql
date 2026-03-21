@@ -55,10 +55,14 @@ end $$;
 
 create table if not exists public.rooms (
   room_code text primary key,
+  chat_mode text not null default 'anonymous',
   active_count integer not null default 0,
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now()
 );
+
+alter table public.rooms
+  add column if not exists chat_mode text not null default 'anonymous';
 
 alter table public.rooms enable row level security;
 

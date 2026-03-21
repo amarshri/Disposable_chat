@@ -38,7 +38,7 @@ export default function Home() {
     const code = generateRoomCode();
     const { error } = await supabase
       .from("rooms")
-      .upsert({ room_code: code });
+      .upsert({ room_code: code, chat_mode: chatMode });
     setBusy(false);
 
     if (error) {
@@ -65,13 +65,18 @@ export default function Home() {
     setBusy(true);
     const { data, error } = await supabase
       .from("rooms")
-      .select("room_code")
+      .select("room_code, chat_mode")
       .eq("room_code", code)
       .maybeSingle();
     setBusy(false);
 
     if (error || !data) {
       setJoinError("Invalid Room Code.");
+      return;
+    }
+
+    if (data.chat_mode === "named" && !displayName.trim()) {
+      setJoinError("This room requires a name to join.");
       return;
     }
 

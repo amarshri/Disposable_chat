@@ -37,6 +37,11 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const [status, setStatus] = useState<"connecting" | "live">("connecting");
   const [username, setUsername] = useState("");
   const [roomExists, setRoomExists] = useState<boolean | null>(null);
+  const [roomMode, setRoomMode] = useState<"anonymous" | "named" | null>(null);
+  const [storedName, setStoredName] = useState("");
+  const [storedMode, setStoredMode] = useState("");
+  const [nameInput, setNameInput] = useState("");
+  const [nameError, setNameError] = useState("");
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -44,13 +49,8 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const joinMessageSentRef = useRef(false);
 
   useEffect(() => {
-    const mode = sessionStorage.getItem("chatMode");
-    const storedName = sessionStorage.getItem("chatName");
-    if (mode === "named" && storedName?.trim()) {
-      setUsername(storedName.trim());
-    } else {
-      setUsername(`User${Math.floor(1000 + Math.random() * 9000)}`);
-    }
+    setStoredMode(sessionStorage.getItem("chatMode") ?? "");
+    setStoredName(sessionStorage.getItem("chatName") ?? "");
   }, []);
 
   useEffect(() => {
@@ -82,11 +82,12 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     const checkRoom = async () => {
       const { data } = await supabase
         .from("rooms")
-        .select("room_code")
+        .select("room_code, chat_mode")
         .eq("room_code", normalizedRoomId)
         .maybeSingle();
       if (active) {
         setRoomExists(Boolean(data));
+        setRoomMode((data?.chat_mode as "anonymous" | "named") ?? "anonymous");
       }
     };
 
@@ -95,6 +96,33 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       active = false;
     };
   }, [isRoomValid, normalizedRoomId]);
+
+  useEffect(() => {
+    if (roomExists !== true || !roomMode) return;
+
+    if (roomMode === "named") {
+      if (storedName.trim()) {
+        setUsername(storedName.trim());
+      }
+      return;
+    }
+
+    if (!username) {
+      setUsername(`User${Math.floor(1000 + Math.random() * 9000)}`);
+    }
+  }, [roomExists, roomMode, storedName, username]);
+
+  const saveNameAndJoin = () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) {
+      setNameError("Enter your name to join this room.");
+      return;
+    }
+    setNameError("");
+    setUsername(trimmed);
+    sessionStorage.setItem("chatMode", "named");
+    sessionStorage.setItem("chatName", trimmed);
+  };
 
   useEffect(() => {
     if (!isRoomValid || roomExists !== true || !username) {
@@ -117,12 +145,19 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       joinedRef.current = true;
 
       if (!joinMessageSentRef.current) {
-        await supabase.from("messages").insert({
+        const { error } = await supabase.from("messages").insert({
           room_id: normalizedRoomId,
-          username,
+          username: "system",
           content: `${username} joined the room`,
           message_type: "system",
         });
+        if (error) {
+          await supabase.from("messages").insert({
+            room_id: normalizedRoomId,
+            username: "system",
+            content: `${username} joined the room`,
+          });
+        }
         joinMessageSentRef.current = true;
       }
     };
@@ -172,12 +207,19 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     if (inputRef.current) {
       inputRef.current.style.height = "auto";
     }
-    await supabase.from("messages").insert({
+    const { error } = await supabase.from("messages").insert({
       room_id: normalizedRoomId,
       username,
       content: trimmed,
       message_type: "user",
     });
+    if (error) {
+      await supabase.from("messages").insert({
+        room_id: normalizedRoomId,
+        username,
+        content: trimmed,
+      });
+    }
   };
 
   const formatTime = (iso: string) =>
@@ -223,6 +265,29 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
         <section className="flex min-h-[60vh] flex-1 min-h-0 flex-col rounded-3xl border border-border bg-card/60">
           <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">
+            {roomExists === true && roomMode === "named" && !username && (
+              <div className="mx-auto flex max-w-md flex-col gap-3 rounded-2xl border border-border bg-black/30 p-4 text-sm">
+                <p className="text-foreground">
+                  This is a named room. Enter your name to join.
+                </p>
+                <input
+                  value={nameInput}
+                  onChange={(event) => setNameInput(event.target.value)}
+                  placeholder="Your name"
+                  className="rounded-xl border border-border bg-black/40 px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
+                />
+                {nameError && (
+                  <p className="text-xs text-red-400">{nameError}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={saveNameAndJoin}
+                  className="rounded-xl border border-accent/40 bg-accent/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-foreground"
+                >
+                  Join Room
+                </button>
+              </div>
+            )}
             {messages.length === 0 ? (
               <div className="flex h-full items-center justify-center text-sm text-muted">
                 {roomExists === false
@@ -233,7 +298,9 @@ export default function RoomClient({ roomId }: RoomClientProps) {
               <div className="flex flex-col gap-4">
                 {messages.map((message) => {
                   const isOwn = message.username === username;
-                  const isSystem = message.message_type === "system";
+                  const isSystem =
+                    message.message_type === "system" ||
+                    message.username === "system";
                   if (isSystem) {
                     return (
                       <div
