@@ -48,9 +48,11 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const leftMessageSentRef = useRef(false);
 
   useEffect(() => {
-    // Always prompt for a name in named rooms; don't auto-fill from storage.
-    if (sessionStorage.getItem("chatMode") === "named") {
-      sessionStorage.removeItem("chatName");
+    // Read any name passed from the home page (create/join flow).
+    const mode = sessionStorage.getItem("chatMode") ?? "";
+    const savedName = sessionStorage.getItem("chatName") ?? "";
+    if (mode === "named" && savedName.trim()) {
+      setUsername(savedName.trim());
     }
   }, []);
 
@@ -102,6 +104,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     if (roomExists !== true || !roomMode) return;
 
     if (roomMode === "named") {
+      // If no name stored, we'll prompt in-room. Otherwise username already set.
       return;
     }
 
@@ -312,6 +315,8 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                   This is a named room. Enter your name to join.
                 </p>
                 <input
+                  id="roomName"
+                  name="roomName"
                   value={nameInput}
                   onChange={(event) => setNameInput(event.target.value)}
                   placeholder="Your name"
