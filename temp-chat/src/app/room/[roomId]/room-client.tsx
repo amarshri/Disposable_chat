@@ -103,6 +103,24 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   }, [isRoomValid, normalizedRoomId]);
 
   useEffect(() => {
+    if (!isRoomValid || roomExists !== true) return;
+    let active = true;
+    const checkMessageType = async () => {
+      const { error } = await supabase
+        .from("messages")
+        .select("message_type")
+        .limit(1);
+      if (active && error) {
+        setSupportsMessageType(false);
+      }
+    };
+    checkMessageType();
+    return () => {
+      active = false;
+    };
+  }, [isRoomValid, roomExists]);
+
+  useEffect(() => {
     if (roomExists !== true || !roomMode) return;
 
     if (roomMode === "named") {
@@ -131,15 +149,22 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     if (leftMessageSentRef.current && content.includes("left the room")) {
       return;
     }
+    if (!content.trim()) return;
     const payload = {
       room_id: normalizedRoomId,
       username: "system",
       content,
       message_type: "system",
     };
-    const { error } = await supabase
-      .from("messages")
-      .insert(supportsMessageType ? payload : { ...payload, message_type: undefined });
+    const { error } = await supabase.from("messages").insert(
+      supportsMessageType
+        ? payload
+        : {
+            room_id: normalizedRoomId,
+            username: "system",
+            content,
+          },
+    );
     if (error) {
       setSupportsMessageType(false);
       await supabase.from("messages").insert({
