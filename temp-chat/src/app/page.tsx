@@ -19,11 +19,13 @@ export default function Home() {
     setGlow(generateRoomCode(4));
   }, []);
 
-  const persistProfile = () => {
-    sessionStorage.setItem("chatMode", chatMode);
+  const persistProfile = (mode: "create" | "join", roomMode?: string) => {
+    const finalMode = roomMode ?? chatMode;
+    sessionStorage.setItem("chatMode", finalMode);
+    sessionStorage.setItem("entryMode", mode);
     sessionStorage.setItem(
       "chatName",
-      chatMode === "named" ? displayName.trim() : "",
+      finalMode === "named" && mode === "create" ? displayName.trim() : "",
     );
   };
 
@@ -46,7 +48,7 @@ export default function Home() {
       return;
     }
 
-    persistProfile();
+    persistProfile("create");
     router.push(`/room/${code}`);
   };
 
@@ -56,11 +58,6 @@ export default function Home() {
       setJoinError("Enter a valid 6-character room code.");
       return;
     }
-    if (chatMode === "named" && !displayName.trim()) {
-      setJoinError("Please enter your name to join a named chat.");
-      return;
-    }
-
     setJoinError("");
     setBusy(true);
     const { data, error } = await supabase
@@ -75,12 +72,7 @@ export default function Home() {
       return;
     }
 
-    if (data.chat_mode === "named" && !displayName.trim()) {
-      setJoinError("This room requires a name to join.");
-      return;
-    }
-
-    persistProfile();
+    persistProfile("join", data.chat_mode);
     router.push(`/room/${code}`);
   };
 

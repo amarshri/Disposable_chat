@@ -40,6 +40,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const [roomMode, setRoomMode] = useState<"anonymous" | "named" | null>(null);
   const [nameInput, setNameInput] = useState("");
   const [nameError, setNameError] = useState("");
+  const [supportsMessageType, setSupportsMessageType] = useState(true);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -48,10 +49,11 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const leftMessageSentRef = useRef(false);
 
   useEffect(() => {
-    // Read any name passed from the home page (create/join flow).
+    // Use stored name only for room creators, not joiners.
     const mode = sessionStorage.getItem("chatMode") ?? "";
+    const entryMode = sessionStorage.getItem("entryMode") ?? "";
     const savedName = sessionStorage.getItem("chatName") ?? "";
-    if (mode === "named" && savedName.trim()) {
+    if (entryMode === "create" && mode === "named" && savedName.trim()) {
       setUsername(savedName.trim());
     }
   }, []);
@@ -135,8 +137,11 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       content,
       message_type: "system",
     };
-    const { error } = await supabase.from("messages").insert(payload);
+    const { error } = await supabase
+      .from("messages")
+      .insert(supportsMessageType ? payload : { ...payload, message_type: undefined });
     if (error) {
+      setSupportsMessageType(false);
       await supabase.from("messages").insert({
         room_id: normalizedRoomId,
         username: "system",
@@ -251,13 +256,22 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     if (inputRef.current) {
       inputRef.current.style.height = "auto";
     }
-    const { error } = await supabase.from("messages").insert({
-      room_id: normalizedRoomId,
-      username,
-      content: trimmed,
-      message_type: "user",
-    });
+    const { error } = await supabase.from("messages").insert(
+      supportsMessageType
+        ? {
+            room_id: normalizedRoomId,
+            username,
+            content: trimmed,
+            message_type: "user",
+          }
+        : {
+            room_id: normalizedRoomId,
+            username,
+            content: trimmed,
+          },
+    );
     if (error) {
+      setSupportsMessageType(false);
       await supabase.from("messages").insert({
         room_id: normalizedRoomId,
         username,
