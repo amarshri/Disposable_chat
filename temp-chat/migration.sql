@@ -143,3 +143,35 @@ $$;
 
 grant execute on function public.increment_room(text) to anon;
 grant execute on function public.decrement_room(text) to anon;
+
+create table if not exists public.room_users (
+  id uuid primary key default gen_random_uuid(),
+  room_code text not null,
+  username text not null,
+  username_key text not null,
+  created_at timestamp with time zone not null default now(),
+  unique (room_code, username_key)
+);
+
+alter table public.room_users enable row level security;
+
+drop policy if exists "Allow anonymous room users read" on public.room_users;
+create policy "Allow anonymous room users read"
+  on public.room_users
+  for select
+  to anon
+  using (true);
+
+drop policy if exists "Allow anonymous room users insert" on public.room_users;
+create policy "Allow anonymous room users insert"
+  on public.room_users
+  for insert
+  to anon
+  with check (true);
+
+drop policy if exists "Allow anonymous room users delete" on public.room_users;
+create policy "Allow anonymous room users delete"
+  on public.room_users
+  for delete
+  to anon
+  using (true);

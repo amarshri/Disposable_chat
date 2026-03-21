@@ -40,12 +40,14 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const [roomMode, setRoomMode] = useState<"anonymous" | "named" | null>(null);
   const [nameInput, setNameInput] = useState("");
   const [nameError, setNameError] = useState("");
+  const [usernameKey, setUsernameKey] = useState("");
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const joinedRef = useRef(false);
   const joinMessageSentRef = useRef(false);
   const leftMessageSentRef = useRef(false);
+  const registeredRef = useRef(false);
 
   useEffect(() => {
     // Use stored name only for room creators, not joiners.
@@ -114,14 +116,44 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     }
   }, [roomExists, roomMode, username]);
 
-  const saveNameAndJoin = () => {
-    const trimmed = nameInput.trim();
+  const normalizeName = (value: string) =>
+    value.trim().toLowerCase();
+
+  const validateName = (value: string) => {
+    const trimmed = value.trim();
     if (!trimmed) {
-      setNameError("Enter your name to join this room.");
+      return "Enter your name to join this room.";
+    }
+    if (!/^[a-zA-Z0-9]+$/.test(trimmed)) {
+      return "Use only letters or numbers. No spaces or symbols.";
+    }
+    if (trimmed.length > 10) {
+      return "Name must be 10 characters or less.";
+    }
+    return "";
+  };
+
+  const saveNameAndJoin = async () => {
+    const trimmed = nameInput.trim();
+    const error = validateName(trimmed);
+    if (error) {
+      setNameError(error);
+      return;
+    }
+    const key = normalizeName(trimmed);
+    const { error: insertError } = await supabase.from("room_users").insert({
+      room_code: normalizedRoomId,
+      username: trimmed,
+      username_key: key,
+    });
+    if (insertError) {
+      setNameError("Username taken. Try adding numbers.");
       return;
     }
     setNameError("");
     setUsername(trimmed);
+    setUsernameKey(key);
+    registeredRef.current = true;
     sessionStorage.setItem("chatMode", "named");
     sessionStorage.setItem("chatName", trimmed);
   };
@@ -151,6 +183,24 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
     let mounted = true;
     const initRoom = async () => {
+      if (roomMode === "named" && !registeredRef.current) {
+        const key = normalizeName(username);
+        const { error: insertError } = await supabase
+          .from("room_users")
+          .insert({
+            room_code: normalizedRoomId,
+            username,
+            username_key: key,
+          });
+        if (insertError) {
+          setNameError("Username taken. Try adding numbers.");
+          setUsername("");
+          return;
+        }
+        setUsernameKey(key);
+        registeredRef.current = true;
+      }
+
       const { data } = await supabase
         .from("messages")
         .select("*")
@@ -198,11 +248,18 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       supabase.removeChannel(channel);
       if (joinedRef.current) {
         sendSystemMessage(`${username} left the room`);
+        if (usernameKey) {
+          supabase
+            .from("room_users")
+            .delete()
+            .eq("room_code", normalizedRoomId)
+            .eq("username_key", usernameKey);
+        }
         supabase.rpc("decrement_room", { p_room: normalizedRoomId });
       }
       joinedRef.current = false;
     };
-  }, [isRoomValid, normalizedRoomId, roomExists, username]);
+  }, [isRoomValid, normalizedRoomId, roomExists, roomMode, username]);
 
   useEffect(() => {
     if (!isRoomValid || roomExists !== true || !username) {
@@ -224,6 +281,22 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         keepalive: true,
       });
       sendSystemMessage(`${username} left the room`);
+      if (usernameKey) {
+        fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/room_users`, {
+          method: "DELETE",
+          headers: {
+            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify({
+            room_code: `eq.${normalizedRoomId}`,
+            username_key: `eq.${usernameKey}`,
+          }),
+          keepalive: true,
+        });
+      }
       joinedRef.current = false;
     };
 
@@ -233,7 +306,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       window.removeEventListener("pagehide", handlePageHide);
       window.removeEventListener("beforeunload", handlePageHide);
     };
-  }, [isRoomValid, normalizedRoomId, roomExists, username]);
+  }, [isRoomValid, normalizedRoomId, roomExists, username, usernameKey]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -311,6 +384,8 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                   value={nameInput}
                   onChange={(event) => setNameInput(event.target.value)}
                   placeholder="Your name"
+                  maxLength={10}
+                  inputMode="text"
                   className="rounded-xl border border-border bg-black/40 px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
                 />
                 {nameError && (

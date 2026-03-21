@@ -29,11 +29,30 @@ export default function Home() {
     );
   };
 
+  const validateDisplayName = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return "Please enter your name to start a named chat.";
+    if (!/^[a-zA-Z0-9]+$/.test(trimmed)) {
+      return "Use only letters or numbers. No spaces or symbols.";
+    }
+    if (trimmed.length > 10) {
+      return "Name must be 10 characters or less.";
+    }
+    return "";
+  };
+
   const handleCreate = async () => {
     setJoinError("");
     if (chatMode === "named" && !displayName.trim()) {
       setJoinError("Please enter your name to start a named chat.");
       return;
+    }
+    if (chatMode === "named") {
+      const error = validateDisplayName(displayName);
+      if (error) {
+        setJoinError(error);
+        return;
+      }
     }
 
     setBusy(true);
@@ -144,6 +163,8 @@ export default function Home() {
                   value={displayName}
                   onChange={(event) => setDisplayName(event.target.value)}
                   placeholder="Your name"
+                  maxLength={10}
+                  inputMode="text"
                   className="rounded-2xl border border-border bg-black/40 px-4 py-3 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
                 />
               )}
