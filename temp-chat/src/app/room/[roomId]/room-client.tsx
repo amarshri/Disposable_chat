@@ -40,7 +40,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const [roomMode, setRoomMode] = useState<"anonymous" | "named" | null>(null);
   const [nameInput, setNameInput] = useState("");
   const [nameError, setNameError] = useState("");
-  const [supportsMessageType, setSupportsMessageType] = useState(true);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -103,24 +102,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   }, [isRoomValid, normalizedRoomId]);
 
   useEffect(() => {
-    if (!isRoomValid || roomExists !== true) return;
-    let active = true;
-    const checkMessageType = async () => {
-      const { error } = await supabase
-        .from("messages")
-        .select("message_type")
-        .limit(1);
-      if (active && error) {
-        setSupportsMessageType(false);
-      }
-    };
-    checkMessageType();
-    return () => {
-      active = false;
-    };
-  }, [isRoomValid, roomExists]);
-
-  useEffect(() => {
     if (roomExists !== true || !roomMode) return;
 
     if (roomMode === "named") {
@@ -150,28 +131,13 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       return;
     }
     if (!content.trim()) return;
-    const payload = {
+    const { error } = await supabase.from("messages").insert({
       room_id: normalizedRoomId,
       username: "system",
       content,
-      message_type: "system",
-    };
-    const { error } = await supabase.from("messages").insert(
-      supportsMessageType
-        ? payload
-        : {
-            room_id: normalizedRoomId,
-            username: "system",
-            content,
-          },
-    );
+    });
     if (error) {
-      setSupportsMessageType(false);
-      await supabase.from("messages").insert({
-        room_id: normalizedRoomId,
-        username: "system",
-        content,
-      });
+      return;
     }
     if (content.includes("left the room")) {
       leftMessageSentRef.current = true;
@@ -281,27 +247,13 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     if (inputRef.current) {
       inputRef.current.style.height = "auto";
     }
-    const { error } = await supabase.from("messages").insert(
-      supportsMessageType
-        ? {
-            room_id: normalizedRoomId,
-            username,
-            content: trimmed,
-            message_type: "user",
-          }
-        : {
-            room_id: normalizedRoomId,
-            username,
-            content: trimmed,
-          },
-    );
+    const { error } = await supabase.from("messages").insert({
+      room_id: normalizedRoomId,
+      username,
+      content: trimmed,
+    });
     if (error) {
-      setSupportsMessageType(false);
-      await supabase.from("messages").insert({
-        room_id: normalizedRoomId,
-        username,
-        content: trimmed,
-      });
+      return;
     }
   };
 
