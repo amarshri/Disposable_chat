@@ -311,6 +311,28 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     };
   }, [isRoomValid, normalizedRoomId, roomExists, roomMode, username]);
 
+  useEffect(() => {
+    if (!isRoomValid || roomExists !== true || !username || !usernameKey) {
+      return;
+    }
+
+    const heartbeat = async () => {
+      await supabase
+        .from("room_users")
+        .update({ last_seen: new Date().toISOString() })
+        .eq("room_code", normalizedRoomId)
+        .eq("username_key", usernameKey);
+      await supabase.rpc("cleanup_room_stale", {
+        p_room: normalizedRoomId,
+        max_age_seconds: 180,
+      });
+    };
+
+    heartbeat();
+    const interval = setInterval(heartbeat, 30000);
+    return () => clearInterval(interval);
+  }, [isRoomValid, roomExists, normalizedRoomId, username, usernameKey]);
+
 
   useEffect(() => {
     if (!isRoomValid || roomExists !== true || !username) {
