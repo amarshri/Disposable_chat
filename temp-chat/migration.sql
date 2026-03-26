@@ -175,3 +175,25 @@ create policy "Allow anonymous room users delete"
   for delete
   to anon
   using (true);
+
+create or replace function public.cleanup_room_if_empty()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from public.room_users where room_code = old.room_code
+  ) then
+    delete from public.messages where room_id = old.room_code;
+    delete from public.rooms where room_code = old.room_code;
+  end if;
+  return old;
+end;
+$$;
+
+drop trigger if exists room_users_cleanup on public.room_users;
+create trigger room_users_cleanup
+after delete on public.room_users
+for each row execute function public.cleanup_room_if_empty();

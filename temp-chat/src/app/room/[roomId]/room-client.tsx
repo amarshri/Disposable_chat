@@ -282,18 +282,14 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       });
       sendSystemMessage(`${username} left the room`);
       if (usernameKey) {
-        fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/room_users`, {
+        const deleteUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/room_users?room_code=eq.${normalizedRoomId}&username_key=eq.${usernameKey}`;
+        fetch(deleteUrl, {
           method: "DELETE",
           headers: {
             apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
             Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""}`,
-            "Content-Type": "application/json",
             Prefer: "return=minimal",
           },
-          body: JSON.stringify({
-            room_code: `eq.${normalizedRoomId}`,
-            username_key: `eq.${usernameKey}`,
-          }),
           keepalive: true,
         });
       }
