@@ -255,7 +255,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         setMessages(data as ChatMessage[]);
       }
 
-      await supabase.rpc("increment_room", { p_room: normalizedRoomId });
       joinedRef.current = true;
 
       if (!joinMessageSentRef.current) {
@@ -299,7 +298,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
             .eq("room_code", normalizedRoomId)
             .eq("username_key", usernameKey);
         }
-        supabase.rpc("decrement_room", { p_room: normalizedRoomId });
         cleanupIfEmpty();
       }
       joinedRef.current = false;
@@ -326,16 +324,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
           keepalive: true,
         });
       }
-      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/decrement_room`, {
-        method: "POST",
-        headers: {
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ p_room: normalizedRoomId }),
-        keepalive: true,
-      });
       fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/cleanup_room_if_empty`, {
         method: "POST",
         headers: {
