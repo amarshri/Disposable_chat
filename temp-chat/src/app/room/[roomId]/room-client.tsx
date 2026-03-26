@@ -64,13 +64,21 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       "navigation",
     )[0] as PerformanceNavigationTiming | undefined;
     if (nav?.type === "reload" || nav?.type === "back_forward") {
-      router.replace("/");
+      const key = `room-refresh-${normalizedRoomId}`;
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, "1");
+        router.replace("/");
+      }
       return;
     }
 
     const handlePageShow = (event: PageTransitionEvent) => {
       if (event.persisted) {
-        router.replace("/");
+        const key = `room-refresh-${normalizedRoomId}`;
+        if (!sessionStorage.getItem(key)) {
+          sessionStorage.setItem(key, "1");
+          router.replace("/");
+        }
       }
     };
 

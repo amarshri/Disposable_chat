@@ -133,6 +133,7 @@ begin
   end if;
 
   if new_count = 0 then
+    delete from public.room_users where room_code = p_room;
     delete from public.messages where room_id = p_room;
     delete from public.rooms where room_code = p_room;
   end if;
