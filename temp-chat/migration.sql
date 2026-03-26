@@ -150,11 +150,18 @@ create table if not exists public.room_users (
   room_code text not null,
   username text not null,
   username_key text not null,
+  last_seen timestamp with time zone not null default now(),
   created_at timestamp with time zone not null default now(),
   unique (room_code, username_key)
 );
 
 alter table public.room_users enable row level security;
+
+alter table public.room_users
+  add column if not exists last_seen timestamp with time zone not null default now();
+
+create index if not exists room_users_room_last_seen_idx
+  on public.room_users (room_code, last_seen desc);
 
 drop policy if exists "Allow anonymous room users read" on public.room_users;
 create policy "Allow anonymous room users read"
@@ -245,3 +252,23 @@ end;
 $$;
 
 grant execute on function public.cleanup_room_if_empty(text) to anon;
+
+create or replace function public.cleanup_room_stale(p_room text, max_age_seconds integer default 60)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.room_users
+  where room_code = p_room
+    and last_seen < now() - make_interval(secs => max_age_seconds);
+
+  if not exists (select 1 from public.room_users where room_code = p_room) then
+    delete from public.messages where room_id = p_room;
+    delete from public.rooms where room_code = p_room;
+  end if;
+end;
+$$;
+
+grant execute on function public.cleanup_room_stale(text, integer) to anon;
