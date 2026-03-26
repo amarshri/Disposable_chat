@@ -177,6 +177,37 @@ create policy "Allow anonymous room users delete"
   to anon
   using (true);
 
+create or replace function public.sync_room_active_count()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare room_count integer;
+begin
+  select count(*) into room_count
+  from public.room_users
+  where room_code = coalesce(new.room_code, old.room_code);
+
+  update public.rooms
+  set active_count = room_count,
+      updated_at = now()
+  where room_code = coalesce(new.room_code, old.room_code);
+
+  return coalesce(new, old);
+end;
+$$;
+
+drop trigger if exists room_users_count_insert on public.room_users;
+create trigger room_users_count_insert
+after insert on public.room_users
+for each row execute function public.sync_room_active_count();
+
+drop trigger if exists room_users_count_delete on public.room_users;
+create trigger room_users_count_delete
+after delete on public.room_users
+for each row execute function public.sync_room_active_count();
+
 create or replace function public.cleanup_room_if_empty()
 returns trigger
 language plpgsql

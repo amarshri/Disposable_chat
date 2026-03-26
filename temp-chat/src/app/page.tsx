@@ -41,8 +41,18 @@ export default function Home() {
     return "";
   };
 
+  const clearRoomRefreshFlags = () => {
+    for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith("room-refresh-")) {
+        sessionStorage.removeItem(key);
+      }
+    }
+  };
+
   const handleCreate = async () => {
     setJoinError("");
+    clearRoomRefreshFlags();
     if (chatMode === "named" && !displayName.trim()) {
       setJoinError("Please enter your name to start a named chat.");
       return;
@@ -73,6 +83,7 @@ export default function Home() {
 
   const handleJoin = async () => {
     const code = normalizeRoomCode(roomInput);
+    clearRoomRefreshFlags();
     if (code.length !== 6) {
       setJoinError("Enter a valid 6-character room code.");
       return;

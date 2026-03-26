@@ -48,6 +48,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const joinMessageSentRef = useRef(false);
   const leftMessageSentRef = useRef(false);
   const registeredRef = useRef(false);
+  const clientIdRef = useRef("");
 
   useEffect(() => {
     // Use stored name only for room creators, not joiners.
@@ -127,6 +128,21 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const normalizeName = (value: string) =>
     value.trim().toLowerCase();
 
+  const getClientId = () => {
+    if (clientIdRef.current) return clientIdRef.current;
+    const storageKey = `anon-${normalizedRoomId}`;
+    let existing = sessionStorage.getItem(storageKey);
+    if (!existing) {
+      existing =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `anon-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      sessionStorage.setItem(storageKey, existing);
+    }
+    clientIdRef.current = existing;
+    return existing;
+  };
+
   const validateName = (value: string) => {
     const trimmed = value.trim();
     if (!trimmed) {
@@ -166,6 +182,27 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     sessionStorage.setItem("chatName", trimmed);
   };
 
+  const registerUser = async () => {
+    if (registeredRef.current || !username) return true;
+    const key =
+      roomMode === "named" ? normalizeName(username) : getClientId();
+    const { error: insertError } = await supabase.from("room_users").insert({
+      room_code: normalizedRoomId,
+      username,
+      username_key: key,
+    });
+    if (insertError) {
+      if (roomMode === "named") {
+        setNameError("Username taken. Try adding numbers.");
+        setUsername("");
+      }
+      return false;
+    }
+    setUsernameKey(key);
+    registeredRef.current = true;
+    return true;
+  };
+
   const sendSystemMessage = async (content: string) => {
     if (leftMessageSentRef.current && content.includes("left the room")) {
       return;
@@ -191,23 +228,8 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
     let mounted = true;
     const initRoom = async () => {
-      if (roomMode === "named" && !registeredRef.current) {
-        const key = normalizeName(username);
-        const { error: insertError } = await supabase
-          .from("room_users")
-          .insert({
-            room_code: normalizedRoomId,
-            username,
-            username_key: key,
-          });
-        if (insertError) {
-          setNameError("Username taken. Try adding numbers.");
-          setUsername("");
-          return;
-        }
-        setUsernameKey(key);
-        registeredRef.current = true;
-      }
+      const ok = await registerUser();
+      if (!ok) return;
 
       const { data } = await supabase
         .from("messages")
@@ -219,7 +241,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         setMessages(data as ChatMessage[]);
       }
 
-      await supabase.rpc("increment_room", { p_room: normalizedRoomId });
       joinedRef.current = true;
 
       if (!joinMessageSentRef.current) {
@@ -263,7 +284,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
             .eq("room_code", normalizedRoomId)
             .eq("username_key", usernameKey);
         }
-        supabase.rpc("decrement_room", { p_room: normalizedRoomId });
       }
       joinedRef.current = false;
     };
@@ -276,18 +296,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
     const handlePageHide = () => {
       if (!joinedRef.current) return;
-      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/decrement_room`;
-      const payload = JSON.stringify({ p_room: normalizedRoomId });
-      fetch(url, {
-        method: "POST",
-        headers: {
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""}`,
-          "Content-Type": "application/json",
-        },
-        body: payload,
-        keepalive: true,
-      });
       sendSystemMessage(`${username} left the room`);
       if (usernameKey) {
         const deleteUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/room_users?room_code=eq.${normalizedRoomId}&username_key=eq.${usernameKey}`;
