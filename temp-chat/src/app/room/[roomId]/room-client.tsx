@@ -65,6 +65,11 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       "navigation",
     )[0] as PerformanceNavigationTiming | undefined;
     if (nav?.type === "reload" || nav?.type === "back_forward") {
+      const entry = sessionStorage.getItem("room-entry");
+      if (entry === normalizedRoomId) {
+        sessionStorage.removeItem("room-entry");
+        return;
+      }
       const key = `room-refresh-${normalizedRoomId}`;
       if (!sessionStorage.getItem(key)) {
         sessionStorage.setItem(key, "1");
@@ -75,6 +80,11 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
     const handlePageShow = (event: PageTransitionEvent) => {
       if (event.persisted) {
+        const entry = sessionStorage.getItem("room-entry");
+        if (entry === normalizedRoomId) {
+          sessionStorage.removeItem("room-entry");
+          return;
+        }
         const key = `room-refresh-${normalizedRoomId}`;
         if (!sessionStorage.getItem(key)) {
           sessionStorage.setItem(key, "1");
@@ -221,6 +231,10 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     }
   };
 
+  const cleanupIfEmpty = async () => {
+    await supabase.rpc("cleanup_room_if_empty", { p_room: normalizedRoomId });
+  };
+
   useEffect(() => {
     if (!isRoomValid || roomExists !== true || !username) {
       return;
@@ -284,6 +298,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
             .eq("room_code", normalizedRoomId)
             .eq("username_key", usernameKey);
         }
+        cleanupIfEmpty();
       }
       joinedRef.current = false;
     };
@@ -309,6 +324,16 @@ export default function RoomClient({ roomId }: RoomClientProps) {
           keepalive: true,
         });
       }
+      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/cleanup_room_if_empty`, {
+        method: "POST",
+        headers: {
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ p_room: normalizedRoomId }),
+        keepalive: true,
+      });
       joinedRef.current = false;
     };
 
@@ -369,12 +394,26 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                 {username || "User----"}
               </span>
               <ThemeToggle />
-              <Link
+              <button
+                type="button"
+                onClick={() => {
+                  if (joinedRef.current) {
+                    sendSystemMessage(`${username} left the room`);
+                    if (usernameKey) {
+                      supabase
+                        .from("room_users")
+                        .delete()
+                        .eq("room_code", normalizedRoomId)
+                        .eq("username_key", usernameKey);
+                    }
+                    cleanupIfEmpty();
+                  }
+                  router.push("/");
+                }}
                 className="rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:border-foreground/40"
-                href="/"
               >
                 Leave Room
-              </Link>
+              </button>
             </div>
           </div>
           <p className="text-sm text-muted">

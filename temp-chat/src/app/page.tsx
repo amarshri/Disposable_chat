@@ -78,6 +78,7 @@ export default function Home() {
     }
 
     persistProfile("create");
+    sessionStorage.setItem("room-entry", code);
     router.push(`/room/${code}`);
   };
 
@@ -103,6 +104,7 @@ export default function Home() {
     }
 
     persistProfile("join", data.chat_mode);
+    sessionStorage.setItem("room-entry", code);
     router.push(`/room/${code}`);
   };
 
