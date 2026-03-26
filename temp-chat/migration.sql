@@ -253,6 +253,25 @@ $$;
 
 grant execute on function public.cleanup_room_if_empty(text) to anon;
 
+create or replace function public.leave_room(p_room text, p_user_key text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.room_users
+  where room_code = p_room and username_key = p_user_key;
+
+  if not exists (select 1 from public.room_users where room_code = p_room) then
+    delete from public.messages where room_id = p_room;
+    delete from public.rooms where room_code = p_room;
+  end if;
+end;
+$$;
+
+grant execute on function public.leave_room(text, text) to anon;
+
 create or replace function public.cleanup_room_stale(p_room text, max_age_seconds integer default 60)
 returns void
 language plpgsql
