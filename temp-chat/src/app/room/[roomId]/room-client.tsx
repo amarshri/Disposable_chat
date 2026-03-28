@@ -41,6 +41,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const [nameInput, setNameInput] = useState("");
   const [nameError, setNameError] = useState("");
   const [usernameKey, setUsernameKey] = useState("");
+  const [onlineCount, setOnlineCount] = useState(0);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -48,6 +49,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const joinMessageSentRef = useRef(false);
   const leftMessageSentRef = useRef(false);
   const registeredRef = useRef(false);
+  const presenceRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const clientIdRef = useRef("");
 
   useEffect(() => {
@@ -274,7 +276,9 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     initRoom();
 
     const channel = supabase
-      .channel(`room:${normalizedRoomId}`)
+      .channel(`room:${normalizedRoomId}`, {
+        config: { presence: { key: usernameKey || getClientId() } },
+      })
       .on(
         "postgres_changes",
         {
@@ -288,11 +292,37 @@ export default function RoomClient({ roomId }: RoomClientProps) {
           setMessages((prev) => [...prev, newMessage].slice(-200));
         },
       )
+      .on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState();
+        const count = Object.keys(state).length;
+        setOnlineCount(count);
+        if (count === 0) {
+          cleanupIfEmpty();
+        }
+      })
+      .on("presence", { event: "join" }, ({ newPresences }) => {
+        const state = channel.presenceState();
+        setOnlineCount(Object.keys(state).length);
+      })
+      .on("presence", { event: "leave" }, () => {
+        const state = channel.presenceState();
+        const count = Object.keys(state).length;
+        setOnlineCount(count);
+        if (count === 0) {
+          cleanupIfEmpty();
+        }
+      })
       .subscribe((state) => {
         if (state === "SUBSCRIBED") {
           setStatus("live");
+          channel.track({
+            username,
+            joined_at: new Date().toISOString(),
+          });
         }
       });
+
+    presenceRef.current = channel;
 
     return () => {
       mounted = false;
