@@ -463,11 +463,10 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                   if (joinedRef.current) {
                     sendSystemMessage(`${username} left the room`);
                     if (usernameKey) {
-                      supabase
-                        .from("room_users")
-                        .delete()
-                        .eq("room_code", normalizedRoomId)
-                        .eq("username_key", usernameKey);
+                      supabase.rpc("leave_room", {
+                        p_room: normalizedRoomId,
+                        p_user_key: usernameKey,
+                      });
                     }
                     cleanupIfEmpty();
                   }
