@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { generateRoomCode, normalizeRoomCode } from "@/lib/room";
+import { supabase } from "@/lib/supabaseClient";
 import ThemeToggle from "@/components/theme-toggle";
 
 export default function Home() {
@@ -12,17 +13,19 @@ export default function Home() {
   const [chatMode, setChatMode] = useState<"anonymous" | "named">("anonymous");
   const [displayName, setDisplayName] = useState("");
   const [joinError, setJoinError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     setGlow(generateRoomCode(4));
   }, []);
 
-  const persistProfile = (mode: "create" | "join") => {
-    sessionStorage.setItem("chatMode", chatMode);
+  const persistProfile = (mode: "create" | "join", roomMode?: string) => {
+    const finalMode = roomMode ?? chatMode;
+    sessionStorage.setItem("chatMode", finalMode);
     sessionStorage.setItem("entryMode", mode);
     sessionStorage.setItem(
       "chatName",
-      chatMode === "named" ? displayName.trim() : "",
+      finalMode === "named" && mode === "create" ? displayName.trim() : "",
     );
   };
 
@@ -38,25 +41,20 @@ export default function Home() {
     return "";
   };
 
-  const handleCreate = () => {
-    setJoinError("");
-    if (chatMode === "named") {
-      const error = validateDisplayName(displayName);
-      if (error) {
-        setJoinError(error);
-        return;
+  const clearRoomRefreshFlags = () => {
+    for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith("room-refresh-")) {
+        sessionStorage.removeItem(key);
       }
     }
-
-    const code = generateRoomCode();
-    persistProfile("create");
-    router.push(`/room/${code}`);
   };
 
-  const handleJoin = () => {
-    const code = normalizeRoomCode(roomInput);
-    if (code.length !== 6) {
-      setJoinError("Enter a valid 6-character room code.");
+  const handleCreate = async () => {
+    setJoinError("");
+    clearRoomRefreshFlags();
+    if (chatMode === "named" && !displayName.trim()) {
+      setJoinError("Please enter your name to start a named chat.");
       return;
     }
     if (chatMode === "named") {
@@ -67,16 +65,54 @@ export default function Home() {
       }
     }
 
+    setBusy(true);
+    const code = generateRoomCode();
+    const { error } = await supabase
+      .from("rooms")
+      .upsert({ room_code: code, chat_mode: chatMode });
+    setBusy(false);
+
+    if (error) {
+      setJoinError("Could not create a room. Please try again.");
+      return;
+    }
+
+    persistProfile("create");
+    sessionStorage.setItem("room-entry", code);
+    router.push(`/room/${code}`);
+  };
+
+  const handleJoin = async () => {
+    const code = normalizeRoomCode(roomInput);
+    clearRoomRefreshFlags();
+    if (code.length !== 6) {
+      setJoinError("Enter a valid 6-character room code.");
+      return;
+    }
     setJoinError("");
-    persistProfile("join");
+    setBusy(true);
+    const { data, error } = await supabase
+      .from("rooms")
+      .select("room_code, chat_mode")
+      .eq("room_code", code)
+      .maybeSingle();
+    setBusy(false);
+
+    if (error || !data) {
+      setJoinError("Invalid Room Code.");
+      return;
+    }
+
+    persistProfile("join", data.chat_mode);
+    sessionStorage.setItem("room-entry", code);
     router.push(`/room/${code}`);
   };
 
   const normalized = normalizeRoomCode(roomInput);
 
   return (
-    <div className="min-h-screen px-4 py-10 text-foreground sm:px-6">
-      <main className="mx-auto flex w-full max-w-5xl flex-col gap-10">
+    <div className="min-h-screen px-6 py-10 text-foreground">
+      <main className="mx-auto flex w-full max-w-4xl flex-col gap-10">
         <header className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-4 text-xs uppercase tracking-[0.4em] text-muted">
             <div className="flex items-center gap-2">
@@ -89,13 +125,13 @@ export default function Home() {
             Spin up a room, share the code, and talk right now.
           </h1>
           <p className="max-w-2xl text-base leading-7 text-muted sm:text-lg">
-            Minimal, anonymous, and temporary chat rooms. Messages disappear
-            when you refresh or leave.
+            Minimal, anonymous, and temporary chat rooms. Messages only live
+            while you are in the room, and a short cleanup keeps rooms fresh.
           </p>
         </header>
 
         <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="flex flex-col gap-6 rounded-3xl border border-border bg-card/80 p-6 shadow-[var(--shadow)] sm:p-8">
+          <div className="flex flex-col gap-6 rounded-3xl border border-border bg-card/80 p-8 shadow-[var(--shadow)]">
             <div className="flex flex-col gap-3">
               <span className="text-sm uppercase tracking-[0.3em] text-muted">
                 Create instantly
@@ -148,7 +184,8 @@ export default function Home() {
             </div>
             <button
               onClick={handleCreate}
-              className="group inline-flex items-center justify-between rounded-2xl border border-accent/40 bg-accent/10 px-6 py-4 text-base font-semibold text-foreground transition hover:border-accent/80 hover:bg-accent/20"
+              disabled={busy}
+              className="group inline-flex items-center justify-between rounded-2xl border border-accent/40 bg-accent/10 px-6 py-4 text-base font-semibold text-foreground transition hover:border-accent/80 hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-60"
               type="button"
             >
               Create Room
@@ -158,7 +195,7 @@ export default function Home() {
             </button>
           </div>
 
-          <div className="flex flex-col gap-6 rounded-3xl border border-border bg-card/60 p-6 sm:p-8">
+          <div className="flex flex-col gap-6 rounded-3xl border border-border bg-card/60 p-8">
             <div className="flex flex-col gap-3">
               <span className="text-sm uppercase tracking-[0.3em] text-muted">
                 Join with code
@@ -189,7 +226,7 @@ export default function Home() {
               />
               <button
                 onClick={handleJoin}
-                disabled={normalized.length !== 6}
+                disabled={normalized.length !== 6 || busy}
                 className="rounded-2xl border border-border bg-foreground/10 px-5 py-3 text-sm font-semibold text-foreground transition hover:border-foreground/40 disabled:cursor-not-allowed disabled:opacity-50"
                 type="button"
               >
