@@ -30,7 +30,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         : roomId;
   const normalizedRoomId = normalizeRoomCode(routeRoomId || roomId);
   const isRoomValid = normalizedRoomId.length === 6;
-  const HEARTBEAT_MS = 25000;
+  const HEARTBEAT_MS = 20000;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -226,6 +226,19 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       .eq("username_key", usernameKey);
   };
 
+  const deleteUserNow = async () => {
+    if (!usernameKey) return;
+    await supabase
+      .from("room_users")
+      .delete()
+      .eq("room_code", normalizedRoomId)
+      .eq("username_key", usernameKey);
+    await supabase.rpc("cleanup_room_stale", {
+      p_room: normalizedRoomId,
+      max_age_seconds: 60,
+    });
+  };
+
   const deleteRoomUserImmediate = () => {
     if (!usernameKey) return;
     const deleteUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/room_users?room_code=eq.${normalizedRoomId}&username_key=eq.${usernameKey}`;
@@ -404,7 +417,10 @@ export default function RoomClient({ roomId }: RoomClientProps) {
               <ThemeToggle />
               <button
                 type="button"
-                onClick={() => router.push("/")}
+                onClick={async () => {
+                  await deleteUserNow();
+                  router.push("/");
+                }}
                 className="rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:border-foreground/40"
               >
                 Leave Room
