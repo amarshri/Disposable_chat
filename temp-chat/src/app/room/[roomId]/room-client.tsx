@@ -239,13 +239,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     }
   };
 
-  const cleanupRoomData = async () => {
-    if (cleanupRunningRef.current) return;
-    cleanupRunningRef.current = true;
-    await supabase.from("messages").delete().eq("room_id", normalizedRoomId);
-    await supabase.from("rooms").delete().eq("room_code", normalizedRoomId);
-    router.replace("/");
-  };
 
   useEffect(() => {
     if (!isRoomValid || roomExists !== true || !username) {
