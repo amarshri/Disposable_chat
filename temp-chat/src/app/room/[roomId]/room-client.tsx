@@ -226,6 +226,20 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       .eq("username_key", usernameKey);
   };
 
+  const deleteRoomUserImmediate = () => {
+    if (!usernameKey) return;
+    const deleteUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/room_users?room_code=eq.${normalizedRoomId}&username_key=eq.${usernameKey}`;
+    fetch(deleteUrl, {
+      method: "DELETE",
+      headers: {
+        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+        Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""}`,
+        Prefer: "return=minimal",
+      },
+      keepalive: true,
+    });
+  };
+
   const sendSystemMessage = async (content: string) => {
     if (!content.trim()) return;
     const { error } = await supabase.from("messages").insert({
@@ -314,6 +328,29 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     usernameKey,
     HEARTBEAT_MS,
   ]);
+
+  useEffect(() => {
+    if (!isRoomValid || roomExists !== true || !usernameKey) {
+      return;
+    }
+
+    const handleBeforeUnload = () => {
+      deleteRoomUserImmediate();
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        deleteRoomUserImmediate();
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [isRoomValid, roomExists, usernameKey, normalizedRoomId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

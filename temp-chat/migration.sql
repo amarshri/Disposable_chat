@@ -2,6 +2,7 @@
 -- Run this in the Supabase SQL editor.
 
 create extension if not exists "pgcrypto";
+create extension if not exists pg_cron;
 
 -- Drop legacy tracking objects (safe to re-run)
 drop trigger if exists room_users_cleanup on public.room_users;
@@ -196,7 +197,9 @@ end;
 $$;
 
 -- Replace any existing schedule with a 60-second job
-select cron.unschedule('cleanup-empty-rooms');
+select cron.unschedule('cleanup-empty-rooms') where exists (
+  select 1 from cron.job where jobname = 'cleanup-empty-rooms'
+);
 select
   cron.schedule(
     'cleanup-empty-rooms',
