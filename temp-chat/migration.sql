@@ -3,6 +3,22 @@
 
 create extension if not exists "pgcrypto";
 
+-- Remove legacy tracking objects (safe to run multiple times)
+drop trigger if exists room_users_cleanup on public.room_users;
+drop trigger if exists room_users_count_insert on public.room_users;
+drop trigger if exists room_users_count_delete on public.room_users;
+
+drop function if exists public.increment_room(text);
+drop function if exists public.decrement_room(text);
+drop function if exists public.leave_room(text, text);
+drop function if exists public.cleanup_room_if_empty(text);
+drop function if exists public.cleanup_room_if_empty();
+drop function if exists public.cleanup_room_stale(text, integer);
+drop function if exists public.sync_room_active_count();
+drop function if exists public.cleanup_empty_rooms();
+
+drop table if exists public.room_users;
+
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
   room_id text not null,
@@ -56,13 +72,12 @@ end $$;
 create table if not exists public.rooms (
   room_code text primary key,
   chat_mode text not null default 'anonymous',
-  active_count integer not null default 0,
   created_at timestamp with time zone not null default now(),
   updated_at timestamp with time zone not null default now()
 );
 
 alter table public.rooms
-  add column if not exists chat_mode text not null default 'anonymous';
+  drop column if exists active_count;
 
 alter table public.rooms enable row level security;
 

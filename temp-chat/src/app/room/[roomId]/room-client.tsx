@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { normalizeRoomCode } from "@/lib/room";
@@ -40,17 +39,12 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const [roomMode, setRoomMode] = useState<"anonymous" | "named" | null>(null);
   const [nameInput, setNameInput] = useState("");
   const [nameError, setNameError] = useState("");
-  const [usernameKey, setUsernameKey] = useState("");
-  const [onlineCount, setOnlineCount] = useState(0);
-
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
-  const joinedRef = useRef(false);
   const joinMessageSentRef = useRef(false);
-  const leftMessageSentRef = useRef(false);
-  const registeredRef = useRef(false);
-  const presenceRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const clientIdRef = useRef("");
+  const cleanupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cleanupRunningRef = useRef(false);
 
   useEffect(() => {
     // Use stored name only for room creators, not joiners.
@@ -137,9 +131,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     }
   }, [roomExists, roomMode, username]);
 
-  const normalizeName = (value: string) =>
-    value.trim().toLowerCase();
-
   const getClientId = () => {
     if (clientIdRef.current) return clientIdRef.current;
     const storageKey = `anon-${normalizedRoomId}`;
@@ -169,64 +160,20 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     return "";
   };
 
-  const saveNameAndJoin = async () => {
+  const saveNameAndJoin = () => {
     const trimmed = nameInput.trim();
     const error = validateName(trimmed);
     if (error) {
       setNameError(error);
       return;
     }
-    const key = normalizeName(trimmed);
-    const { error: insertError } = await supabase.from("room_users").upsert(
-      {
-        room_code: normalizedRoomId,
-        username: trimmed,
-        username_key: key,
-        last_seen: new Date().toISOString(),
-      },
-      { onConflict: "room_code,username_key" },
-    );
-    if (insertError) {
-      setNameError("Username taken. Try adding numbers.");
-      return;
-    }
     setNameError("");
     setUsername(trimmed);
-    setUsernameKey(key);
-    registeredRef.current = true;
     sessionStorage.setItem("chatMode", "named");
     sessionStorage.setItem("chatName", trimmed);
   };
 
-  const registerUser = async () => {
-    if (registeredRef.current || !username) return true;
-    const key =
-      roomMode === "named" ? normalizeName(username) : getClientId();
-    const { error: insertError } = await supabase.from("room_users").upsert(
-      {
-        room_code: normalizedRoomId,
-        username,
-        username_key: key,
-        last_seen: new Date().toISOString(),
-      },
-      { onConflict: "room_code,username_key" },
-    );
-    if (insertError) {
-      if (roomMode === "named") {
-        setNameError("Username taken. Try adding numbers.");
-        setUsername("");
-      }
-      return false;
-    }
-    setUsernameKey(key);
-    registeredRef.current = true;
-    return true;
-  };
-
   const sendSystemMessage = async (content: string) => {
-    if (leftMessageSentRef.current && content.includes("left the room")) {
-      return;
-    }
     if (!content.trim()) return;
     const { error } = await supabase.from("messages").insert({
       room_id: normalizedRoomId,
@@ -236,13 +183,14 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     if (error) {
       return;
     }
-    if (content.includes("left the room")) {
-      leftMessageSentRef.current = true;
-    }
   };
 
-  const cleanupIfEmpty = async () => {
-    await supabase.rpc("cleanup_room_if_empty", { p_room: normalizedRoomId });
+  const cleanupRoomData = async () => {
+    if (cleanupRunningRef.current) return;
+    cleanupRunningRef.current = true;
+    await supabase.from("messages").delete().eq("room_id", normalizedRoomId);
+    await supabase.from("rooms").delete().eq("room_code", normalizedRoomId);
+    router.replace("/");
   };
 
   useEffect(() => {
@@ -252,9 +200,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
     let mounted = true;
     const initRoom = async () => {
-      const ok = await registerUser();
-      if (!ok) return;
-
       const { data } = await supabase
         .from("messages")
         .select("*")
@@ -265,8 +210,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         setMessages(data as ChatMessage[]);
       }
 
-      joinedRef.current = true;
-
       if (!joinMessageSentRef.current) {
         await sendSystemMessage(`${username} joined the room`);
         joinMessageSentRef.current = true;
@@ -275,9 +218,24 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
     initRoom();
 
+    const scheduleCleanup = (count: number) => {
+      if (cleanupTimeoutRef.current) {
+        clearTimeout(cleanupTimeoutRef.current);
+        cleanupTimeoutRef.current = null;
+      }
+      if (count !== 1) return;
+      cleanupTimeoutRef.current = setTimeout(() => {
+        const state = channel.presenceState();
+        const latestCount = Object.keys(state).length;
+        if (latestCount === 1) {
+          cleanupRoomData();
+        }
+      }, 2500);
+    };
+
     const channel = supabase
       .channel(`room:${normalizedRoomId}`, {
-        config: { presence: { key: usernameKey || getClientId() } },
+        config: { presence: { key: getClientId() } },
       })
       .on(
         "postgres_changes",
@@ -295,22 +253,17 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState();
         const count = Object.keys(state).length;
-        setOnlineCount(count);
-        if (count === 0) {
-          cleanupIfEmpty();
-        }
+        scheduleCleanup(count);
       })
       .on("presence", { event: "join" }, ({ newPresences }) => {
         const state = channel.presenceState();
-        setOnlineCount(Object.keys(state).length);
+        const count = Object.keys(state).length;
+        scheduleCleanup(count);
       })
       .on("presence", { event: "leave" }, () => {
         const state = channel.presenceState();
         const count = Object.keys(state).length;
-        setOnlineCount(count);
-        if (count === 0) {
-          cleanupIfEmpty();
-        }
+        scheduleCleanup(count);
       })
       .subscribe((state) => {
         if (state === "SUBSCRIBED") {
@@ -322,91 +275,14 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         }
       });
 
-    presenceRef.current = channel;
-
     return () => {
       mounted = false;
       supabase.removeChannel(channel);
-      if (joinedRef.current) {
-        sendSystemMessage(`${username} left the room`);
-        if (usernameKey) {
-          supabase.rpc("leave_room", {
-            p_room: normalizedRoomId,
-            p_user_key: usernameKey,
-          });
-        }
-        cleanupIfEmpty();
+      if (cleanupTimeoutRef.current) {
+        clearTimeout(cleanupTimeoutRef.current);
       }
-      joinedRef.current = false;
     };
   }, [isRoomValid, normalizedRoomId, roomExists, roomMode, username]);
-
-  useEffect(() => {
-    if (!isRoomValid || roomExists !== true || !username || !usernameKey) {
-      return;
-    }
-
-    const heartbeat = async () => {
-      await supabase
-        .from("room_users")
-        .update({ last_seen: new Date().toISOString() })
-        .eq("room_code", normalizedRoomId)
-        .eq("username_key", usernameKey);
-      await supabase.rpc("cleanup_room_stale", {
-        p_room: normalizedRoomId,
-        max_age_seconds: 180,
-      });
-    };
-
-    heartbeat();
-    const interval = setInterval(heartbeat, 30000);
-    return () => clearInterval(interval);
-  }, [isRoomValid, roomExists, normalizedRoomId, username, usernameKey]);
-
-
-  useEffect(() => {
-    if (!isRoomValid || roomExists !== true || !username) {
-      return;
-    }
-
-    const handlePageHide = () => {
-      if (!joinedRef.current) return;
-      sendSystemMessage(`${username} left the room`);
-      if (usernameKey) {
-        fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/leave_room`, {
-          method: "POST",
-          headers: {
-            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            p_room: normalizedRoomId,
-            p_user_key: usernameKey,
-          }),
-          keepalive: true,
-        });
-      }
-      fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/cleanup_room_if_empty`, {
-        method: "POST",
-        headers: {
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ p_room: normalizedRoomId }),
-        keepalive: true,
-      });
-      joinedRef.current = false;
-    };
-
-    window.addEventListener("pagehide", handlePageHide);
-    window.addEventListener("beforeunload", handlePageHide);
-    return () => {
-      window.removeEventListener("pagehide", handlePageHide);
-      window.removeEventListener("beforeunload", handlePageHide);
-    };
-  }, [isRoomValid, normalizedRoomId, roomExists, username, usernameKey]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -459,19 +335,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
               <ThemeToggle />
               <button
                 type="button"
-                onClick={() => {
-                  if (joinedRef.current) {
-                    sendSystemMessage(`${username} left the room`);
-                    if (usernameKey) {
-                      supabase.rpc("leave_room", {
-                        p_room: normalizedRoomId,
-                        p_user_key: usernameKey,
-                      });
-                    }
-                    cleanupIfEmpty();
-                  }
-                  router.push("/");
-                }}
+                onClick={() => router.push("/")}
                 className="rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:border-foreground/40"
               >
                 Leave Room
