@@ -154,22 +154,52 @@ create policy "Allow anonymous room users delete"
   using (true);
 
 -- Cleanup function: deletes room/messages when all users are stale
-create or replace function public.cleanup_room_stale(p_room text, max_age_seconds integer default 120)
+create or replace function public.cleanup_room_stale(p_room text, max_age_seconds integer default 60)
 returns void
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare removed_users integer;
 begin
   delete from public.room_users
   where room_code = p_room
     and last_seen < now() - make_interval(secs => max_age_seconds);
+  get diagnostics removed_users = row_count;
+  if removed_users > 0 then
+    raise notice 'cleanup_room_stale: removed % stale users from room %', removed_users, p_room;
+  end if;
 
   if not exists (select 1 from public.room_users where room_code = p_room) then
     delete from public.messages where room_id = p_room;
     delete from public.rooms where room_code = p_room;
+    raise notice 'cleanup_room_stale: deleted room % and its messages', p_room;
   end if;
 end;
 $$;
 
 grant execute on function public.cleanup_room_stale(text, integer) to anon;
+
+-- Cron job: run cleanup for all rooms every 60 seconds
+create or replace function public.cleanup_all_rooms(max_age_seconds integer default 60)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare r record;
+begin
+  for r in select room_code from public.rooms loop
+    perform public.cleanup_room_stale(r.room_code, max_age_seconds);
+  end loop;
+end;
+$$;
+
+-- Replace any existing schedule with a 60-second job
+select cron.unschedule('cleanup-empty-rooms');
+select
+  cron.schedule(
+    'cleanup-empty-rooms',
+    '*/1 * * * *',
+    $$ select public.cleanup_all_rooms(60); $$
+  );

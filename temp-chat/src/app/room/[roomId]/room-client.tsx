@@ -30,7 +30,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         : roomId;
   const normalizedRoomId = normalizeRoomCode(routeRoomId || roomId);
   const isRoomValid = normalizedRoomId.length === 6;
-  const STALE_SECONDS = 120;
   const HEARTBEAT_MS = 25000;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -302,10 +301,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
     const heartbeat = async () => {
       await updateLastSeen();
-      await supabase.rpc("cleanup_room_stale", {
-        p_room: normalizedRoomId,
-        max_age_seconds: STALE_SECONDS,
-      });
     };
 
     heartbeat();
@@ -317,7 +312,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     normalizedRoomId,
     username,
     usernameKey,
-    STALE_SECONDS,
     HEARTBEAT_MS,
   ]);
 
