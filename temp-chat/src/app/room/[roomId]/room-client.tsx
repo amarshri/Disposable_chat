@@ -45,11 +45,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const joinMessageSentRef = useRef(false);
   const clientIdRef = useRef("");
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const lastScrollTopRef = useRef(0);
-  const [isAtBottom, setIsAtBottom] = useState(true);
-  const [showNewMessages, setShowNewMessages] = useState(false);
-  const [showTopBar, setShowTopBar] = useState(true);
 
   useEffect(() => {
     // Use stored name only for room creators, not joiners.
@@ -337,21 +332,8 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   ]);
 
   useEffect(() => {
-    if (messages.length === 0) {
-      setShowNewMessages(false);
-      return;
-    }
-    if (!scrollRef.current) return;
-    if (isAtBottom) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-      setShowNewMessages(false);
-    } else {
-      setShowNewMessages(true);
-    }
-  }, [messages, isAtBottom]);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const sendMessage = async () => {
     const trimmed = input.trim();
@@ -386,208 +368,173 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       minute: "2-digit",
     });
 
-  const handleScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    setIsAtBottom(nearBottom);
-    if (nearBottom) {
-      setShowNewMessages(false);
-    }
-    const last = lastScrollTopRef.current;
-    if (el.scrollTop < last - 6) {
-      setShowTopBar(true);
-    } else if (el.scrollTop > last + 6) {
-      setShowTopBar(false);
-    }
-    lastScrollTopRef.current = el.scrollTop;
-  };
-
-  const scrollToBottom = () => {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: "smooth",
-    });
-    setShowNewMessages(false);
-  };
-
   return (
-    <div className="relative min-h-screen bg-background text-foreground">
-      <div
-        className={`pointer-events-none fixed top-4 left-0 right-0 z-20 px-4 transition-all duration-300 md:top-6 md:left-1/2 md:right-auto md:w-[min(90vw,900px)] md:-translate-x-1/2 ${
-          showTopBar ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
-        }`}
-      >
-        <div className="pointer-events-auto flex flex-wrap items-center justify-between gap-3 rounded-full bg-[#0b2545]/90 px-4 py-2 text-xs text-white shadow-[0_10px_30px_rgba(0,0,0,0.25)] backdrop-blur">
-          <div className="flex items-center gap-2 font-mono uppercase tracking-[0.25em]">
-            <span className="rounded-full bg-white/10 px-3 py-1">
-              {roomExists === false ? "Invalid room" : normalizedRoomId}
-            </span>
-            <span className="rounded-full bg-emerald-400/20 px-3 py-1 text-emerald-100">
-              {status === "live" ? "Live" : "Connecting"}
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="rounded-full bg-white/10 px-3 py-1 text-[11px]">
-              {username || "User----"}
-            </span>
-            <ThemeToggle />
-            <button
-              type="button"
-              onClick={async () => {
-                await deleteUserNow();
-                router.push("/");
-              }}
-              className="rounded-full bg-white px-4 py-1 text-[11px] font-semibold text-[#0b2545]"
-            >
-              Leave Room
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="mx-auto flex w-full max-w-full flex-col md:max-w-[900px]">
-        <div
-          ref={scrollRef}
-          onScroll={handleScroll}
-          className="flex-1 overflow-y-auto px-4 pb-24 pt-24 md:px-6"
-        >
-          {roomExists === true && roomMode === "named" && !username && (
-            <div className="mx-auto flex max-w-md flex-col gap-3 rounded-2xl border border-border bg-black/30 p-4 text-sm">
-              <p className="text-foreground">
-                This is a named room. Enter your name to join.
+    <div className="min-h-screen px-6 py-8">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+        <header className="flex flex-col gap-3 rounded-3xl border border-border bg-card/80 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-muted">
+                Room Code
               </p>
-              <input
-                id="roomName"
-                name="roomName"
-                value={nameInput}
-                onChange={(event) => setNameInput(event.target.value)}
-                placeholder="Your name"
-                maxLength={10}
-                inputMode="text"
-                className="rounded-xl border border-border bg-black/40 px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
-              />
-              {nameError && (
-                <p className="text-xs text-red-400">{nameError}</p>
-              )}
+              <h1 className="text-2xl font-semibold text-foreground">
+                {roomExists === false ? "Invalid room" : normalizedRoomId}
+              </h1>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
+              <span className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 font-mono text-xs uppercase tracking-[0.3em] text-accent">
+                {status === "live" ? "Live" : "Connecting"}
+              </span>
+              <span className="rounded-full border border-border px-3 py-1 font-mono text-xs">
+                {username || "User----"}
+              </span>
+              <ThemeToggle />
               <button
                 type="button"
-                onClick={saveNameAndJoin}
-                className="rounded-xl border border-accent/40 bg-accent/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-foreground"
+                onClick={async () => {
+                  await deleteUserNow();
+                  router.push("/");
+                }}
+                className="rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:border-foreground/40"
               >
-                Join Room
+                Leave Room
               </button>
             </div>
-          )}
-          {messages.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-sm text-muted">
-              {roomExists === false
-                ? "This room code is not valid. Go back and try again."
-                : "No messages yet. Say hello to get things going."}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3 md:gap-4">
-              {messages.map((message) => {
-                const isOwn = message.username === username;
-                const isSystem =
-                  message.message_type === "system" ||
-                  message.username === "system";
-                if (isSystem) {
+          </div>
+          <p className="text-sm text-muted">
+            Share this code to invite others. Messages persist while at least
+            one user is connected.
+          </p>
+        </header>
+
+        <section className="flex min-h-[60vh] flex-1 min-h-0 flex-col rounded-3xl border border-border bg-card/60">
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">
+            {roomExists === true && roomMode === "named" && !username && (
+              <div className="mx-auto flex max-w-md flex-col gap-3 rounded-2xl border border-border bg-black/30 p-4 text-sm">
+                <p className="text-foreground">
+                  This is a named room. Enter your name to join.
+                </p>
+                <input
+                  id="roomName"
+                  name="roomName"
+                  value={nameInput}
+                  onChange={(event) => setNameInput(event.target.value)}
+                  placeholder="Your name"
+                  maxLength={10}
+                  inputMode="text"
+                  className="rounded-xl border border-border bg-black/40 px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
+                />
+                {nameError && (
+                  <p className="text-xs text-red-400">{nameError}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={saveNameAndJoin}
+                  className="rounded-xl border border-accent/40 bg-accent/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-foreground"
+                >
+                  Join Room
+                </button>
+              </div>
+            )}
+            {messages.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-sm text-muted">
+                {roomExists === false
+                  ? "This room code is not valid. Go back and try again."
+                  : "No messages yet. Say hello to get things going."}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {messages.map((message) => {
+                  const isOwn = message.username === username;
+                  const isSystem =
+                    message.message_type === "system" ||
+                    message.username === "system";
+                  if (isSystem) {
+                    return (
+                      <div
+                        key={message.id}
+                        className="rounded-full border border-border bg-foreground/5 px-4 py-2 text-center text-xs text-muted"
+                      >
+                        {message.content}
+                      </div>
+                    );
+                  }
                   return (
                     <div
                       key={message.id}
-                      className="mx-auto rounded-full bg-foreground/10 px-4 py-2 text-center text-[11px] text-muted"
-                    >
-                      {message.content}
-                    </div>
-                  );
-                }
-                return (
-                  <div
-                    key={message.id}
-                    className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`relative max-w-[70%] rounded-[18px] px-4 py-2 text-sm leading-6 ${
-                        isOwn
-                          ? "bg-gradient-to-br from-[#4a6bff] via-[#6a5cff] to-[#8c4dff] text-white after:absolute after:bottom-1 after:right-[-6px] after:h-3 after:w-3 after:rotate-45 after:rounded-[2px] after:bg-[#6a5cff]"
-                          : "bg-slate-200 text-slate-900 after:absolute after:bottom-1 after:left-[-6px] after:h-3 after:w-3 after:rotate-45 after:rounded-[2px] after:bg-slate-200 dark:bg-slate-700 dark:text-white dark:after:bg-slate-700"
+                      className={`flex ${
+                        isOwn ? "justify-end" : "justify-start"
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-3 text-[11px] text-black/60 dark:text-white/70">
-                        <span
-                          className={`font-medium ${
-                            isOwn ? "text-white/90" : "text-slate-700 dark:text-white/80"
-                          }`}
-                        >
-                          {message.username}
-                        </span>
-                        <span className={isOwn ? "text-white/70" : ""}>
-                          {formatTime(message.created_at)}
-                        </span>
+                      <div
+                        className={`max-w-[75%] rounded-2xl border px-4 py-3 text-sm leading-6 ${
+                          isOwn
+                            ? "border-[#274769] bg-[#1b2d44] text-white"
+                            : "border-accent/40 bg-accent/10 text-foreground"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3 text-xs text-muted">
+                          <span
+                            className={`font-medium ${
+                              isOwn ? "text-white/90" : "text-foreground"
+                            }`}
+                          >
+                            {message.username}
+                          </span>
+                          <span className={isOwn ? "text-white/70" : ""}>
+                            {formatTime(message.created_at)}
+                          </span>
+                        </div>
+                        <p className="mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                          {message.content}
+                        </p>
                       </div>
-                      <p className="mt-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-                        {message.content}
-                      </p>
                     </div>
-                  </div>
-                );
-              })}
-              <div ref={bottomRef} />
+                  );
+                })}
+                <div ref={bottomRef} />
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-border px-6 py-4">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <label htmlFor="messageInput" className="sr-only">
+                Message
+              </label>
+              <textarea
+                id="messageInput"
+                name="message"
+                ref={inputRef}
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                onInput={(event) => {
+                  const target = event.currentTarget;
+                  target.style.height = "auto";
+                  target.style.height = `${target.scrollHeight}px`;
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    sendMessage();
+                  }
+                }}
+                placeholder="Type a message..."
+                rows={1}
+                disabled={!isRoomValid || !username || roomExists !== true}
+                className="flex-1 resize-none rounded-2xl border border-border bg-black/40 px-4 py-3 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              />
+              <button
+                type="button"
+                onClick={sendMessage}
+                disabled={!isRoomValid || !username || roomExists !== true}
+                className="rounded-2xl border border-accent/40 bg-accent/10 px-6 py-3 text-sm font-semibold text-foreground transition hover:border-accent/80 hover:bg-accent/20"
+              >
+                Send
+              </button>
             </div>
-          )}
-        </div>
-      </div>
-
-      {showNewMessages && (
-        <div className="fixed bottom-24 left-0 right-0 z-20 flex justify-center">
-          <button
-            type="button"
-            onClick={scrollToBottom}
-            className="rounded-full bg-[#0b2545] px-4 py-2 text-xs font-semibold text-white shadow-md"
-          >
-            New Messages ↓
-          </button>
-        </div>
-      )}
-
-      <div className="fixed bottom-0 left-0 right-0 z-20 px-4 pb-4 pt-2">
-        <div className="mx-auto flex w-full max-w-full items-center gap-3 rounded-full bg-white/90 px-3 py-2 shadow-[0_10px_30px_rgba(0,0,0,0.12)] backdrop-blur dark:bg-[#0f172a]/90 md:max-w-[900px]">
-          <label htmlFor="messageInput" className="sr-only">
-            Message
-          </label>
-          <textarea
-            id="messageInput"
-            name="message"
-            ref={inputRef}
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            onInput={(event) => {
-              const target = event.currentTarget;
-              target.style.height = "auto";
-              target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                sendMessage();
-              }
-            }}
-            placeholder="Type a message..."
-            rows={1}
-            disabled={!isRoomValid || !username || roomExists !== true}
-            className="max-h-28 flex-1 resize-none rounded-full border border-transparent bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-          />
-          <button
-            type="button"
-            onClick={sendMessage}
-            disabled={!isRoomValid || !username || roomExists !== true}
-            className="rounded-full bg-[#0b2545] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#14345f] disabled:opacity-50"
-          >
-            Send
-          </button>
-        </div>
+          </div>
+        </section>
       </div>
     </div>
   );
