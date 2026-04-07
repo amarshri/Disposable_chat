@@ -15,6 +15,7 @@ drop function if exists public.leave_room(text, text);
 drop function if exists public.cleanup_room_if_empty(text);
 drop function if exists public.cleanup_room_if_empty();
 drop function if exists public.cleanup_room_stale(text, integer);
+drop function if exists public.leave_room_atomic(text, text);
 drop function if exists public.sync_room_active_count();
 drop function if exists public.cleanup_empty_rooms();
 
@@ -154,8 +155,34 @@ create policy "Allow anonymous room users delete"
   to anon
   using (true);
 
+-- Leave room: remove user and delete room data if empty (atomic)
+create or replace function public.leave_room_atomic(p_room text, p_username_key text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare remaining_users integer;
+begin
+  delete from public.room_users
+  where room_code = p_room
+    and username_key = p_username_key;
+
+  select count(*) into remaining_users
+  from public.room_users
+  where room_code = p_room;
+
+  if remaining_users = 0 then
+    delete from public.messages where room_id = p_room;
+    delete from public.rooms where room_code = p_room;
+  end if;
+end;
+$$;
+
+grant execute on function public.leave_room_atomic(text, text) to anon;
+
 -- Cleanup function: deletes room/messages when all users are stale
-create or replace function public.cleanup_room_stale(p_room text, max_age_seconds integer default 60)
+create or replace function public.cleanup_room_stale(p_room text, max_age_seconds integer default 300)
 returns void
 language plpgsql
 security definer
@@ -182,7 +209,7 @@ $$;
 grant execute on function public.cleanup_room_stale(text, integer) to anon;
 
 -- Cron job: run cleanup for all rooms every 60 seconds
-create or replace function public.cleanup_all_rooms(max_age_seconds integer default 60)
+create or replace function public.cleanup_all_rooms(max_age_seconds integer default 300)
 returns void
 language plpgsql
 security definer
@@ -204,5 +231,5 @@ select
   cron.schedule(
     'cleanup-empty-rooms',
     '*/1 * * * *',
-    $$ select public.cleanup_all_rooms(60); $$
+    $$ select public.cleanup_all_rooms(300); $$
   );

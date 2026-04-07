@@ -30,7 +30,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         : roomId;
   const normalizedRoomId = normalizeRoomCode(routeRoomId || roomId);
   const isRoomValid = normalizedRoomId.length === 6;
-  const HEARTBEAT_MS = 20000;
+  const HEARTBEAT_MS = 35000;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -228,28 +228,9 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
   const deleteUserNow = async () => {
     if (!usernameKey) return;
-    await supabase
-      .from("room_users")
-      .delete()
-      .eq("room_code", normalizedRoomId)
-      .eq("username_key", usernameKey);
-    await supabase.rpc("cleanup_room_stale", {
+    await supabase.rpc("leave_room_atomic", {
       p_room: normalizedRoomId,
-      max_age_seconds: 60,
-    });
-  };
-
-  const deleteRoomUserImmediate = () => {
-    if (!usernameKey) return;
-    const deleteUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/room_users?room_code=eq.${normalizedRoomId}&username_key=eq.${usernameKey}`;
-    fetch(deleteUrl, {
-      method: "DELETE",
-      headers: {
-        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
-        Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""}`,
-        Prefer: "return=minimal",
-      },
-      keepalive: true,
+      p_username_key: usernameKey,
     });
   };
 
@@ -328,6 +309,14 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
     const heartbeat = async () => {
       await updateLastSeen();
+      const { data: roomCheck } = await supabase
+        .from("rooms")
+        .select("room_code")
+        .eq("room_code", normalizedRoomId)
+        .maybeSingle();
+      if (!roomCheck) {
+        setRoomExists(false);
+      }
     };
 
     heartbeat();
@@ -341,29 +330,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     usernameKey,
     HEARTBEAT_MS,
   ]);
-
-  useEffect(() => {
-    if (!isRoomValid || roomExists !== true || !usernameKey) {
-      return;
-    }
-
-    const handleBeforeUnload = () => {
-      deleteRoomUserImmediate();
-    };
-
-    const handleVisibility = () => {
-      if (document.visibilityState === "hidden") {
-        deleteRoomUserImmediate();
-      }
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      document.removeEventListener("visibilitychange", handleVisibility);
-    };
-  }, [isRoomValid, roomExists, usernameKey, normalizedRoomId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -384,6 +350,14 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       content: trimmed,
     });
     if (error) {
+      const { data: roomCheck } = await supabase
+        .from("rooms")
+        .select("room_code")
+        .eq("room_code", normalizedRoomId)
+        .maybeSingle();
+      if (!roomCheck) {
+        setRoomExists(false);
+      }
       return;
     }
   };
