@@ -16,30 +16,6 @@ share a code, and chat instantly.
 - Supabase (Postgres + Realtime)
 - Vercel (frontend deployment)
 
-## Supabase Setup
-
-1. Create a new Supabase project (free tier is fine).
-2. Open the SQL editor and run `migration.sql` from the repo root.
-3. Confirm Realtime is enabled for `public.messages`.
-
-## Environment Variables
-
-Create a `.env.local` file:
-
-```bash
-NEXT_PUBLIC_SUPABASE_URL=your-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-```
-
-## Run Locally
-
-```bash
-npm install
-npm run dev
-```
-
-Open `http://localhost:3000`.
-
 ## Notes
 
 - Messages are only shown from live inserts. Refreshing the page clears the
