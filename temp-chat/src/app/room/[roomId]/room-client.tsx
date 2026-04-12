@@ -335,16 +335,12 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   ]);
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    setIsAtBottom(nearBottom);
-    if (nearBottom) {
-      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-      setShowNewMessages(false);
-    } else {
-      setShowNewMessages(true);
-    }
+    if (!scrollRef.current) return;
+    scrollRef.current.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+    setShowNewMessages(false);
   }, [messages]);
 
   const handleScroll = () => {
@@ -445,11 +441,10 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         <section className="flex flex-1 flex-col rounded-3xl bg-[var(--chat-card)] px-4 pb-4 pt-3 shadow-[var(--chat-shadow)]">
           <div
             ref={scrollRef}
-            onScroll={handleScroll}
             className="flex-1 overflow-y-auto px-2 pb-2 pt-1 sm:px-3"
           >
             {roomExists === true && roomMode === "named" && !username && (
-              <div className="mx-auto flex max-w-md flex-col gap-3 rounded-2xl border border-border bg-white/80 p-4 text-sm shadow-sm dark:border-[#283350] dark:bg-[#0f172a]">
+              <div className="mx-auto flex max-w-md flex-col gap-3 rounded-2xl border border-border bg-white/80 p-4 text-sm shadow-sm dark:border-[#283350] dark:bg-[#101827]">
                 <p className="text-foreground">
                   This is a named room. Enter your name to join.
                 </p>
@@ -461,7 +456,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                   placeholder="Your name"
                   maxLength={10}
                   inputMode="text"
-                  className="rounded-xl border border-[#d7e2f1] bg-[#f7f9ff] px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-[#6aa2ff] focus:outline-none dark:border-[#2b3753] dark:bg-[#0f172a]"
+                  className="rounded-xl border border-[#d7e2f1] bg-[#f7f9ff] px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-[#6aa2ff] focus:outline-none dark:border-[#2b3753] dark:bg-[#141b2d] dark:text-white"
                 />
                 {nameError && (
                   <p className="text-xs text-red-400">{nameError}</p>
