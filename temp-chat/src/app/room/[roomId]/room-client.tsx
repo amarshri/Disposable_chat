@@ -371,7 +371,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   return (
     <div className="min-h-screen bg-[#f3f6fb] text-foreground dark:bg-[#0b1220]">
       <div className="mx-auto flex min-h-screen w-full max-w-[900px] flex-col px-4 pb-6 pt-6 sm:px-6">
-        <header className="mb-4 rounded-3xl bg-white px-5 py-4 shadow-[0_12px_30px_rgba(30,60,120,0.08)] dark:bg-[#141b2d]">
+        <header className="mb-4 rounded-3xl bg-white px-5 py-4 shadow-[0_12px_30px_rgba(30,60,120,0.08)] dark:bg-[#141b2d] dark:shadow-none">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-muted">
@@ -385,7 +385,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
               <span className="rounded-full bg-[#eaf1ff] px-3 py-1 font-semibold text-[#4b76ff] dark:bg-[#1b2742] dark:text-[#8fb3ff]">
                 {status === "live" ? "Live" : "Connecting"}
               </span>
-              <span className="rounded-full bg-[#f1f5fb] px-3 py-1 font-medium text-[#5b6b85] dark:bg-[#1b2438] dark:text-[#a7b3c8]">
+              <span className="rounded-full bg-[#f1f5fb] px-3 py-1 font-medium text-[#5b6b85] dark:bg-[#1b253b] dark:text-[#a7b3c8]">
                 {username || "User----"}
               </span>
               <ThemeToggle />
@@ -398,7 +398,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                 await deleteUserNow();
                 router.push("/");
               }}
-              className="rounded-full bg-[#6aa2ff] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#5a91f2] dark:bg-[#2756b8] dark:hover:bg-[#2f63cf]"
+              className="rounded-full bg-[#6aa2ff] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#5a91f2] dark:bg-[#274769] dark:hover:bg-[#31527a]"
             >
               Leave Room
             </button>
@@ -408,10 +408,10 @@ export default function RoomClient({ roomId }: RoomClientProps) {
           </div>
         </header>
 
-        <section className="flex flex-1 flex-col rounded-3xl bg-white px-4 pb-4 pt-3 shadow-[0_12px_30px_rgba(30,60,120,0.08)] dark:bg-[#141b2d]">
+        <section className="flex flex-1 flex-col rounded-3xl bg-white px-4 pb-4 pt-3 shadow-[0_12px_30px_rgba(30,60,120,0.08)] dark:bg-[#141b2d] dark:shadow-none">
           <div className="flex-1 overflow-y-auto px-2 pb-2 pt-1 sm:px-3">
             {roomExists === true && roomMode === "named" && !username && (
-              <div className="mx-auto flex max-w-md flex-col gap-3 rounded-2xl border border-border bg-white/80 p-4 text-sm shadow-sm dark:border-[#283350] dark:bg-[#10182b]">
+              <div className="mx-auto flex max-w-md flex-col gap-3 rounded-2xl border border-border bg-white/80 p-4 text-sm shadow-sm dark:border-[#283350] dark:bg-[#0f172a]">
                 <p className="text-foreground">
                   This is a named room. Enter your name to join.
                 </p>
@@ -454,7 +454,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                     return (
                       <div
                         key={message.id}
-                        className="mx-auto inline-flex items-center gap-2 rounded-full bg-[#eef3fb] px-3 py-1 text-[11px] text-[#6c7a92] dark:bg-[#1a2438] dark:text-[#9aa7bd]"
+                        className="mx-auto inline-flex items-center gap-2 rounded-full bg-[#eef3fb] px-3 py-1 text-[11px] text-[#6c7a92] dark:bg-[#1b253b] dark:text-[#9aa7bd]"
                       >
                         <span className="h-2 w-2 rounded-full bg-[#6aa2ff]" />
                         {message.content}
@@ -469,7 +469,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                       <div
                         className={`max-w-[70%] rounded-[18px] px-3 py-2 text-sm leading-6 ${
                           isOwn
-                            ? "bg-[#7ca8f8] text-white dark:bg-[#2a4f9b]"
+                            ? "bg-[#7ca8f8] text-white dark:bg-[#1b2d44]"
                             : "bg-[#eef3fb] text-[#3a4a62] dark:bg-[#1b253b] dark:text-[#d6dfef]"
                         }`}
                       >
@@ -491,7 +491,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
             )}
           </div>
 
-          <div className="mt-2 flex items-center gap-2 rounded-2xl bg-[#eef4ff] px-3 py-2 dark:bg-[#0f172a]">
+          <div className="mt-2 flex items-center gap-2 rounded-2xl bg-[#eef4ff] px-3 py-2 dark:bg-[#0f172a] dark:border dark:border-[#1b2538]">
             <label htmlFor="messageInput" className="sr-only">
               Message
             </label>
@@ -521,7 +521,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
               type="button"
               onClick={sendMessage}
               disabled={!isRoomValid || !username || roomExists !== true}
-              className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#6aa2ff] text-white shadow-sm transition hover:bg-[#5a91f2] disabled:opacity-50 dark:bg-[#2a4f9b] dark:hover:bg-[#3562bf]"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#6aa2ff] text-white shadow-sm transition hover:bg-[#5a91f2] disabled:opacity-50 dark:bg-[#274769] dark:hover:bg-[#31527a]"
               aria-label="Send message"
             >
               <svg
