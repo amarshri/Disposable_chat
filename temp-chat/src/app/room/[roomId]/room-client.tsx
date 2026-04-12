@@ -45,9 +45,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const joinMessageSentRef = useRef(false);
   const clientIdRef = useRef("");
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const [isAtBottom, setIsAtBottom] = useState(true);
-  const [showNewMessages, setShowNewMessages] = useState(false);
 
   useEffect(() => {
     // Use stored name only for room creators, not joiners.
@@ -335,32 +332,8 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   ]);
 
   useEffect(() => {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: "smooth",
-    });
-    setShowNewMessages(false);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  const handleScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    setIsAtBottom(nearBottom);
-    if (nearBottom) {
-      setShowNewMessages(false);
-    }
-  };
-
-  const scrollToBottom = () => {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: "smooth",
-    });
-    setShowNewMessages(false);
-  };
 
   const sendMessage = async () => {
     const trimmed = input.trim();
@@ -422,29 +395,23 @@ export default function RoomClient({ roomId }: RoomClientProps) {
             <button
               type="button"
               onClick={async () => {
-                if (username) {
-                  await sendSystemMessage(`${username} left the room`);
-                }
                 await deleteUserNow();
                 router.push("/");
               }}
-              className="rounded-full border border-[var(--chat-leave-bg)] bg-[var(--chat-leave-bg)] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[var(--chat-leave-hover)]"
+              className="rounded-full bg-[var(--chat-leave-bg)] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[var(--chat-leave-hover)]"
             >
               Leave Room
             </button>
             <p className="text-xs text-muted">
-              Share this code to chat with others.
+              Messages persist while at least one user is connected.
             </p>
           </div>
         </header>
 
         <section className="flex flex-1 flex-col rounded-3xl bg-[var(--chat-card)] px-4 pb-4 pt-3 shadow-[var(--chat-shadow)]">
-          <div
-            ref={scrollRef}
-            className="flex-1 overflow-y-auto px-2 pb-2 pt-1 sm:px-3"
-          >
+          <div className="flex-1 overflow-y-auto px-2 pb-2 pt-1 sm:px-3">
             {roomExists === true && roomMode === "named" && !username && (
-              <div className="mx-auto flex max-w-md flex-col gap-3 rounded-2xl border border-border bg-white/80 p-4 text-sm shadow-sm dark:border-[#283350] dark:bg-[#101827]">
+              <div className="mx-auto flex max-w-md flex-col gap-3 rounded-2xl border border-border bg-white/80 p-4 text-sm shadow-sm dark:border-[#283350] dark:bg-[#0f172a]">
                 <p className="text-foreground">
                   This is a named room. Enter your name to join.
                 </p>
@@ -456,7 +423,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                   placeholder="Your name"
                   maxLength={10}
                   inputMode="text"
-                  className="rounded-xl border border-[#d7e2f1] bg-[#f7f9ff] px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-[#6aa2ff] focus:outline-none dark:border-[#2b3753] dark:bg-[#141b2d] dark:text-white"
+                  className="rounded-xl border border-[#d7e2f1] bg-[#f7f9ff] px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-[#6aa2ff] focus:outline-none dark:border-[#2b3753] dark:bg-[#0f172a]"
                 />
                 {nameError && (
                   <p className="text-xs text-red-400">{nameError}</p>
@@ -524,18 +491,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
             )}
           </div>
 
-          {showNewMessages && (
-            <div className="mt-2 flex justify-center">
-              <button
-                type="button"
-                onClick={scrollToBottom}
-                className="rounded-full border border-[var(--chat-leave-bg)] bg-white/80 px-4 py-1 text-[11px] font-semibold text-[var(--chat-leave-bg)] shadow-sm dark:bg-[#0f172a]"
-              >
-                New messages ↓
-              </button>
-            </div>
-          )}
-
           <div className="mt-2 flex items-center gap-2 rounded-2xl border border-[var(--chat-input-border)] bg-[var(--chat-input-bg)] px-3 py-2">
             <label htmlFor="messageInput" className="sr-only">
               Message
@@ -566,7 +521,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
               type="button"
               onClick={sendMessage}
               disabled={!isRoomValid || !username || roomExists !== true}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--chat-send-bg)] bg-[var(--chat-send-bg)] text-white shadow-sm transition hover:bg-[var(--chat-send-hover)] disabled:opacity-50"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--chat-send-bg)] text-white shadow-sm transition hover:bg-[var(--chat-send-hover)] disabled:opacity-50"
               aria-label="Send message"
             >
               <svg
