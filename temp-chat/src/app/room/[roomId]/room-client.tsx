@@ -426,9 +426,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
             <button
               type="button"
               onClick={async () => {
-                if (username) {
-                  await sendSystemMessage(`${username} left the room`);
-                }
                 await deleteUserNow();
                 router.push("/");
               }}
