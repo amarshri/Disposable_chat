@@ -414,8 +414,8 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         <section className="flex flex-1 flex-col rounded-3xl bg-[var(--chat-card)] px-4 pb-4 pt-3 shadow-[var(--chat-shadow)]">
           <div className="flex-1 overflow-y-auto px-2 pb-2 pt-1 sm:px-3">
             {roomExists === true && roomMode === "named" && !username && (
-              <div className="mx-auto flex max-w-md flex-col gap-3 rounded-2xl border border-border bg-white/95 p-5 text-sm shadow-[0_12px_30px_rgba(30,60,120,0.12)] dark:border-[#283350] dark:bg-[#121a2c]">
-                <p className="text-foreground">
+              <div className="mx-auto flex max-w-md flex-col gap-3 rounded-2xl border border-border bg-white/95 p-5 text-sm shadow-[0_12px_30px_rgba(30,60,120,0.12)] dark:border-[#283350] dark:bg-[#0f172a]">
+                <p className="text-foreground dark:text-[#e6edf3]">
                   This is a named room. Enter your name to join.
                 </p>
                 <input
@@ -426,7 +426,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                   placeholder="Your name"
                   maxLength={10}
                   inputMode="text"
-                  className="rounded-2xl border border-[#d3ddf0] bg-[#f6f9ff] px-4 py-3 text-sm text-[#1f2f4b] placeholder:text-[#8b9ab2] focus:border-[#6aa2ff] focus:outline-none dark:border-[#2b3753] dark:bg-[#f3f6ff] dark:text-[#0f172a] dark:placeholder:text-[#7b8aa6]"
+                  className="rounded-2xl border border-[#d3ddf0] bg-[#f6f9ff] px-4 py-3 text-sm text-[#1f2f4b] placeholder:text-[#8b9ab2] focus:border-[#6aa2ff] focus:outline-none dark:border-[#2b3753] dark:bg-[#101827] dark:text-[#e6edf3] dark:placeholder:text-[#9aa7bd]"
                 />
                 {nameError && (
                   <p className="text-xs text-red-400">{nameError}</p>
