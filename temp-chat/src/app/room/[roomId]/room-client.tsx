@@ -473,7 +473,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                             : "bg-[var(--chat-received-bg)] text-[var(--chat-received-text)]"
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-3 text-[10px] text-[#6c7a92] dark:text-[#9aa7bd]">
+                        <div className={`flex items-center justify-between gap-3 text-[10px] ${isOwn ? "text-[var(--chat-sent-meta)]" : "text-[#6c7a92] dark:text-[#9aa7bd]"}`}>
                           <span className="font-medium">
                             {message.username}
                           </span>

@@ -25,6 +25,7 @@
   --chat-received-bg: #1b253b;
   --chat-received-text: #d6dfef;
   --chat-sent-bg: #1b2d44;
+  --chat-sent-meta: rgba(255, 255, 255, 0.7);
   --chat-input-bg: #0f172a;
   --chat-input-border: #1b2538;
   --chat-send-bg: #274769;
@@ -57,6 +58,7 @@
   --chat-received-bg: #eef3fb;
   --chat-received-text: #3a4a62;
   --chat-sent-bg: #7ca8f8;
+  --chat-sent-meta: #000000;
   --chat-input-bg: #eef4ff;
   --chat-input-border: transparent;
   --chat-send-bg: #6aa2ff;
