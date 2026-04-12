@@ -371,7 +371,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   return (
     <div className="min-h-screen bg-[#f3f6fb] text-foreground dark:bg-[#0b1220]">
       <div className="mx-auto flex min-h-screen w-full max-w-[900px] flex-col px-4 pb-6 pt-6 sm:px-6">
-        <header className="mb-4 rounded-3xl bg-white px-5 py-4 shadow-[0_12px_30px_rgba(30,60,120,0.08)] dark:bg-[#141b2d]">
+        <header className="mb-4 rounded-3xl bg-white px-5 py-4 shadow-[0_12px_30px_rgba(30,60,120,0.08)] dark:bg-[#101827] dark:shadow-none">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-muted">
@@ -408,7 +408,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
           </div>
         </header>
 
-        <section className="flex flex-1 flex-col rounded-3xl bg-white px-4 pb-4 pt-3 shadow-[0_12px_30px_rgba(30,60,120,0.08)] dark:bg-[#141b2d]">
+        <section className="flex flex-1 flex-col rounded-3xl bg-white px-4 pb-4 pt-3 shadow-[0_12px_30px_rgba(30,60,120,0.08)] dark:bg-[#0f1626] dark:shadow-none">
           <div className="flex-1 overflow-y-auto px-2 pb-2 pt-1 sm:px-3">
             {roomExists === true && roomMode === "named" && !username && (
               <div className="mx-auto flex max-w-md flex-col gap-3 rounded-2xl border border-border bg-white/80 p-4 text-sm shadow-sm dark:border-[#283350] dark:bg-[#10182b]">
@@ -491,7 +491,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
             )}
           </div>
 
-          <div className="mt-2 flex items-center gap-2 rounded-2xl bg-[#eef4ff] px-3 py-2 dark:bg-[#0f172a]">
+          <div className="mt-2 flex items-center gap-2 rounded-2xl bg-[#eef4ff] px-3 py-2 dark:bg-[#0c1322] dark:border dark:border-[#1b2538]">
             <label htmlFor="messageInput" className="sr-only">
               Message
             </label>
@@ -515,7 +515,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
               placeholder="Type message..."
               rows={1}
               disabled={!isRoomValid || !username || roomExists !== true}
-              className="flex-1 resize-none rounded-xl bg-transparent px-2 py-2 text-sm text-foreground placeholder:text-[#9aa7bd] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex-1 resize-none rounded-xl bg-transparent px-2 py-2 text-sm text-foreground placeholder:text-[#9aa7bd] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:placeholder:text-[#6f7f9c]"
             />
             <button
               type="button"
