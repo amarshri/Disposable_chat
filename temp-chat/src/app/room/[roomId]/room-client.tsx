@@ -395,6 +395,9 @@ export default function RoomClient({ roomId }: RoomClientProps) {
             <button
               type="button"
               onClick={async () => {
+                if (username) {
+                  await sendSystemMessage(`${username} left the room`);
+                }
                 await deleteUserNow();
                 router.push("/");
               }}
@@ -403,7 +406,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
               Leave Room
             </button>
             <p className="text-xs text-muted">
-              Messages persist while at least one user is connected.
+              Share code to chat with other.
             </p>
           </div>
         </header>
