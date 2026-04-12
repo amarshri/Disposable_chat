@@ -369,48 +369,49 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     });
 
   return (
-    <div className="min-h-screen px-6 py-8">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-        <header className="flex flex-col gap-3 rounded-3xl border border-border bg-card/80 p-6">
+    <div className="min-h-screen bg-[#f3f6fb] text-foreground dark:bg-[#0b1220]">
+      <div className="mx-auto flex min-h-screen w-full max-w-[900px] flex-col px-4 pb-6 pt-6 sm:px-6">
+        <header className="mb-4 rounded-3xl bg-white px-5 py-4 shadow-[0_12px_30px_rgba(30,60,120,0.08)] dark:bg-[#141b2d]">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-muted">
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-muted">
                 Room Code
               </p>
-              <h1 className="text-2xl font-semibold text-foreground">
+              <h1 className="text-xl font-semibold text-foreground">
                 {roomExists === false ? "Invalid room" : normalizedRoomId}
               </h1>
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
-              <span className="rounded-full border border-accent/40 bg-accent/10 px-3 py-1 font-mono text-xs uppercase tracking-[0.3em] text-accent">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+              <span className="rounded-full bg-[#eaf1ff] px-3 py-1 font-semibold text-[#4b76ff] dark:bg-[#1b2742] dark:text-[#8fb3ff]">
                 {status === "live" ? "Live" : "Connecting"}
               </span>
-              <span className="rounded-full border border-border px-3 py-1 font-mono text-xs">
+              <span className="rounded-full bg-[#f1f5fb] px-3 py-1 font-medium text-[#5b6b85] dark:bg-[#1b2438] dark:text-[#a7b3c8]">
                 {username || "User----"}
               </span>
               <ThemeToggle />
-              <button
-                type="button"
-                onClick={async () => {
-                  await deleteUserNow();
-                  router.push("/");
-                }}
-                className="rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:border-foreground/40"
-              >
-                Leave Room
-              </button>
             </div>
           </div>
-          <p className="text-sm text-muted">
-            Share this code to invite others. Messages persist while at least
-            one user is connected.
-          </p>
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={async () => {
+                await deleteUserNow();
+                router.push("/");
+              }}
+              className="rounded-full bg-[#6aa2ff] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#5a91f2] dark:bg-[#2756b8] dark:hover:bg-[#2f63cf]"
+            >
+              Leave Room
+            </button>
+            <p className="text-xs text-muted">
+              Messages persist while at least one user is connected.
+            </p>
+          </div>
         </header>
 
-        <section className="flex min-h-[60vh] flex-1 min-h-0 flex-col rounded-3xl border border-border bg-card/60">
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">
+        <section className="flex flex-1 flex-col rounded-3xl bg-white px-4 pb-4 pt-3 shadow-[0_12px_30px_rgba(30,60,120,0.08)] dark:bg-[#141b2d]">
+          <div className="flex-1 overflow-y-auto px-2 pb-2 pt-1 sm:px-3">
             {roomExists === true && roomMode === "named" && !username && (
-              <div className="mx-auto flex max-w-md flex-col gap-3 rounded-2xl border border-border bg-black/30 p-4 text-sm">
+              <div className="mx-auto flex max-w-md flex-col gap-3 rounded-2xl border border-border bg-white/80 p-4 text-sm shadow-sm dark:border-[#283350] dark:bg-[#10182b]">
                 <p className="text-foreground">
                   This is a named room. Enter your name to join.
                 </p>
@@ -422,7 +423,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                   placeholder="Your name"
                   maxLength={10}
                   inputMode="text"
-                  className="rounded-xl border border-border bg-black/40 px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none"
+                  className="rounded-xl border border-[#d7e2f1] bg-[#f7f9ff] px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-[#6aa2ff] focus:outline-none dark:border-[#2b3753] dark:bg-[#0f172a]"
                 />
                 {nameError && (
                   <p className="text-xs text-red-400">{nameError}</p>
@@ -430,7 +431,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                 <button
                   type="button"
                   onClick={saveNameAndJoin}
-                  className="rounded-xl border border-accent/40 bg-accent/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-foreground"
+                  className="rounded-xl bg-[#6aa2ff] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white"
                 >
                   Join Room
                 </button>
@@ -443,7 +444,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                   : "No messages yet. Say hello to get things going."}
               </div>
             ) : (
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3 pb-2">
                 {messages.map((message) => {
                   const isOwn = message.username === username;
                   const isSystem =
@@ -453,8 +454,9 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                     return (
                       <div
                         key={message.id}
-                        className="rounded-full border border-border bg-foreground/5 px-4 py-2 text-center text-xs text-muted"
+                        className="mx-auto inline-flex items-center gap-2 rounded-full bg-[#eef3fb] px-3 py-1 text-[11px] text-[#6c7a92] dark:bg-[#1a2438] dark:text-[#9aa7bd]"
                       >
+                        <span className="h-2 w-2 rounded-full bg-[#6aa2ff]" />
                         {message.content}
                       </div>
                     );
@@ -462,30 +464,22 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                   return (
                     <div
                       key={message.id}
-                      className={`flex ${
-                        isOwn ? "justify-end" : "justify-start"
-                      }`}
+                      className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
                     >
                       <div
-                        className={`max-w-[75%] rounded-2xl border px-4 py-3 text-sm leading-6 ${
+                        className={`max-w-[70%] rounded-[18px] px-3 py-2 text-sm leading-6 ${
                           isOwn
-                            ? "border-[#274769] bg-[#1b2d44] text-white"
-                            : "border-accent/40 bg-accent/10 text-foreground"
+                            ? "bg-[#7ca8f8] text-white dark:bg-[#2a4f9b]"
+                            : "bg-[#eef3fb] text-[#3a4a62] dark:bg-[#1b253b] dark:text-[#d6dfef]"
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-3 text-xs text-muted">
-                          <span
-                            className={`font-medium ${
-                              isOwn ? "text-white/90" : "text-foreground"
-                            }`}
-                          >
+                        <div className="flex items-center justify-between gap-3 text-[10px] text-[#6c7a92] dark:text-[#9aa7bd]">
+                          <span className="font-medium">
                             {message.username}
                           </span>
-                          <span className={isOwn ? "text-white/70" : ""}>
-                            {formatTime(message.created_at)}
-                          </span>
+                          <span>{formatTime(message.created_at)}</span>
                         </div>
-                        <p className="mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                        <p className="mt-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                           {message.content}
                         </p>
                       </div>
@@ -497,42 +491,52 @@ export default function RoomClient({ roomId }: RoomClientProps) {
             )}
           </div>
 
-          <div className="border-t border-border px-6 py-4">
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <label htmlFor="messageInput" className="sr-only">
-                Message
-              </label>
-              <textarea
-                id="messageInput"
-                name="message"
-                ref={inputRef}
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-                onInput={(event) => {
-                  const target = event.currentTarget;
-                  target.style.height = "auto";
-                  target.style.height = `${target.scrollHeight}px`;
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    sendMessage();
-                  }
-                }}
-                placeholder="Type a message..."
-                rows={1}
-                disabled={!isRoomValid || !username || roomExists !== true}
-                className="flex-1 resize-none rounded-2xl border border-border bg-black/40 px-4 py-3 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-              />
-              <button
-                type="button"
-                onClick={sendMessage}
-                disabled={!isRoomValid || !username || roomExists !== true}
-                className="rounded-2xl border border-accent/40 bg-accent/10 px-6 py-3 text-sm font-semibold text-foreground transition hover:border-accent/80 hover:bg-accent/20"
+          <div className="mt-2 flex items-center gap-2 rounded-2xl bg-[#eef4ff] px-3 py-2 dark:bg-[#0f172a]">
+            <label htmlFor="messageInput" className="sr-only">
+              Message
+            </label>
+            <textarea
+              id="messageInput"
+              name="message"
+              ref={inputRef}
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onInput={(event) => {
+                const target = event.currentTarget;
+                target.style.height = "auto";
+                target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  sendMessage();
+                }
+              }}
+              placeholder="Type message..."
+              rows={1}
+              disabled={!isRoomValid || !username || roomExists !== true}
+              className="flex-1 resize-none rounded-xl bg-transparent px-2 py-2 text-sm text-foreground placeholder:text-[#9aa7bd] focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            />
+            <button
+              type="button"
+              onClick={sendMessage}
+              disabled={!isRoomValid || !username || roomExists !== true}
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#6aa2ff] text-white shadow-sm transition hover:bg-[#5a91f2] disabled:opacity-50 dark:bg-[#2a4f9b] dark:hover:bg-[#3562bf]"
+              aria-label="Send message"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                Send
-              </button>
-            </div>
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            </button>
           </div>
         </section>
       </div>
