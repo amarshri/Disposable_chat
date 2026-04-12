@@ -335,17 +335,17 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   ]);
 
   useEffect(() => {
-    if (!scrollRef.current) return;
-    if (isAtBottom) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: "smooth",
-      });
+    const el = scrollRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    setIsAtBottom(nearBottom);
+    if (nearBottom) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
       setShowNewMessages(false);
     } else {
       setShowNewMessages(true);
     }
-  }, [messages, isAtBottom]);
+  }, [messages]);
 
   const handleScroll = () => {
     const el = scrollRef.current;
@@ -426,6 +426,9 @@ export default function RoomClient({ roomId }: RoomClientProps) {
             <button
               type="button"
               onClick={async () => {
+                if (username) {
+                  await sendSystemMessage(`${username} left the room`);
+                }
                 await deleteUserNow();
                 router.push("/");
               }}
